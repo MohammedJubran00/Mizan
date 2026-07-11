@@ -1,4 +1,5 @@
 import cors from 'cors';
+import compression from 'compression';
 import express from 'express';
 import helmet from 'helmet';
 
@@ -10,12 +11,17 @@ import { errorHandler } from './shared/errors/errorHandler';
 export function createApp() {
   const app = express();
 
+  // Trust proxy for correct compressed responses behind load balancers.
+  app.set('trust proxy', 1);
+  app.set('etag', false); // Dashboard sets strong ETags explicitly when needed.
+
   app.use(helmet());
   app.use(
     cors({
       origin: env.corsOrigin === '*' ? true : env.corsOrigin.split(','),
     }),
   );
+  app.use(compression({ threshold: 1024 }));
   app.use(express.json({ limit: '100kb' }));
 
   app.get('/health', (_req, res) => {

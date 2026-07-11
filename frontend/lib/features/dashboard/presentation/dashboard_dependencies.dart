@@ -1,3 +1,4 @@
+import '../../../core/cache/smart_cache.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/session/session_cubit.dart';
 import '../../../core/storage/session_storage.dart';
@@ -96,10 +97,16 @@ class AppDependencies {
   /// Wired when a dashboard cubit is active; safe no-op otherwise.
   DashboardCubit? activeDashboardCubit;
 
-  Future<void> refreshDashboardAfterMutation() async {
+  Future<void> refreshDashboardAfterMutation({
+    String? workspaceId,
+    Set<CacheDomain>? domains,
+  }) async {
     final cubit = activeDashboardCubit;
     if (cubit == null || cubit.isClosed) return;
-    await cubit.invalidateAfterMutation();
+    await cubit.invalidateAfterMutation(
+      workspaceId: workspaceId,
+      domains: domains,
+    );
   }
 
   static void reset() {

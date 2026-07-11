@@ -1,5 +1,6 @@
 import type { ActivitySeverity, ActivityType, Prisma } from '@prisma/client';
 
+import type { CacheInvalidator } from '../../../shared/cache/cache-invalidator';
 import type { ActivitiesDto, ActivityItemDto } from '../dto';
 import type {
   DashboardActivityRepository,
@@ -27,10 +28,19 @@ export interface ActivityEventInput {
  * The Dashboard timeline consumes via ActivityTimelineService.
  */
 export class ActivityEngineService {
-  constructor(private readonly activityRepository: DashboardActivityRepository) {}
+  constructor(
+    private readonly activityRepository: DashboardActivityRepository,
+    private readonly cacheInvalidator?: CacheInvalidator,
+  ) {}
 
   async record(input: ActivityEventInput): Promise<ActivityItemDto> {
     const created = await this.activityRepository.create(input as RecordActivityInput);
+    if (this.cacheInvalidator) {
+      await this.cacheInvalidator.invalidateForMutation(
+        input.workspaceId,
+        input.type,
+      );
+    }
     return mapActivity(created);
   }
 

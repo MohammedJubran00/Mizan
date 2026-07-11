@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/session/session_cubit.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/utils/infinite_scroll_controller.dart';
 import '../cubit/activity_cubit.dart';
 import '../cubit/chart_cubit.dart';
 import '../cubit/dashboard_cubit.dart';
@@ -32,13 +33,20 @@ class DashboardHomePage extends StatefulWidget {
 class _DashboardHomePageState extends State<DashboardHomePage> {
   late final DashboardCubit _dashboardCubit;
   final _scrollController = ScrollController();
+  late final InfiniteScrollController _infiniteScroll;
 
   @override
   void initState() {
     super.initState();
     _dashboardCubit = AppDependencies.instance.createDashboardCubit();
     AppDependencies.instance.activeDashboardCubit = _dashboardCubit;
-    _scrollController.addListener(_onScroll);
+    _infiniteScroll = InfiniteScrollController(
+      onLoadMore: () => _dashboardCubit.loadMoreActivities(),
+      canLoadMore: () =>
+          _dashboardCubit.state.data?.activitiesPagination.hasMore == true &&
+          !_dashboardCubit.activityCubit.state.isLoadingMore,
+    );
+    _infiniteScroll.attach(_scrollController);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _dashboardCubit.load();
@@ -51,19 +59,10 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
     if (AppDependencies.instance.activeDashboardCubit == _dashboardCubit) {
       AppDependencies.instance.activeDashboardCubit = null;
     }
-    _scrollController
-      ..removeListener(_onScroll)
-      ..dispose();
+    _infiniteScroll.dispose();
+    _scrollController.dispose();
     _dashboardCubit.close();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 240) {
-      _dashboardCubit.loadMoreActivities();
-    }
   }
 
   @override
@@ -165,7 +164,10 @@ class _DashboardBody extends StatelessWidget {
         }
 
         return RefreshIndicator(
-          onRefresh: () => context.read<DashboardCubit>().load(refresh: true),
+          onRefresh: () => context.read<DashboardCubit>().load(
+                refresh: true,
+                forceRefresh: true,
+              ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
@@ -232,6 +234,10 @@ class _OverviewGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<OverviewCubit, OverviewState>(
+      buildWhen: (prev, next) =>
+          prev.status != next.status ||
+          prev.overview != next.overview ||
+          prev.errorMessage != next.errorMessage,
       builder: (context, state) {
         if (state.status == SectionStatus.loading ||
             state.status == SectionStatus.initial) {
@@ -244,7 +250,8 @@ class _OverviewGrid extends StatelessWidget {
         if (state.status == SectionStatus.failure || state.overview == null) {
           return SectionError(
             message: state.errorMessage ?? 'Failed to load overview.',
-            onRetry: () => context.read<DashboardCubit>().load(),
+            onRetry: () =>
+                context.read<DashboardCubit>().load(forceRefresh: true),
           );
         }
 
@@ -344,14 +351,21 @@ class _HearingsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<HearingCubit, HearingState>(
+      buildWhen: (prev, next) =>
+          prev.status != next.status ||
+          prev.items != next.items ||
+          prev.errorMessage != next.errorMessage,
       builder: (context, state) {
-        return UpcomingHearingsPanel(
-          items: state.items,
-          isLoading: state.status == SectionStatus.loading ||
-              state.status == SectionStatus.initial,
-          errorMessage:
-              state.status == SectionStatus.failure ? state.errorMessage : null,
-          onRetry: () => context.read<DashboardCubit>().load(),
+        return RepaintBoundary(
+          child: UpcomingHearingsPanel(
+            items: state.items,
+            isLoading: state.status == SectionStatus.loading ||
+                state.status == SectionStatus.initial,
+            errorMessage: state.status == SectionStatus.failure
+                ? state.errorMessage
+                : null,
+            onRetry: () => context.read<DashboardCubit>().load(forceRefresh: true),
+          ),
         );
       },
     );
@@ -364,14 +378,21 @@ class _DeadlinesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<DeadlineCubit, DeadlineState>(
+      buildWhen: (prev, next) =>
+          prev.status != next.status ||
+          prev.items != next.items ||
+          prev.errorMessage != next.errorMessage,
       builder: (context, state) {
-        return DeadlinesPanel(
-          items: state.items,
-          isLoading: state.status == SectionStatus.loading ||
-              state.status == SectionStatus.initial,
-          errorMessage:
-              state.status == SectionStatus.failure ? state.errorMessage : null,
-          onRetry: () => context.read<DashboardCubit>().load(),
+        return RepaintBoundary(
+          child: DeadlinesPanel(
+            items: state.items,
+            isLoading: state.status == SectionStatus.loading ||
+                state.status == SectionStatus.initial,
+            errorMessage: state.status == SectionStatus.failure
+                ? state.errorMessage
+                : null,
+            onRetry: () => context.read<DashboardCubit>().load(forceRefresh: true),
+          ),
         );
       },
     );
@@ -384,17 +405,26 @@ class _ActivitySection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ActivityCubit, ActivityState>(
+      buildWhen: (prev, next) =>
+          prev.status != next.status ||
+          prev.groups != next.groups ||
+          prev.hasMore != next.hasMore ||
+          prev.isLoadingMore != next.isLoadingMore ||
+          prev.errorMessage != next.errorMessage,
       builder: (context, state) {
-        return RecentActivityPanel(
-          groups: state.groups,
-          isLoading: state.status == SectionStatus.loading ||
-              state.status == SectionStatus.initial,
-          hasMore: state.hasMore,
-          isLoadingMore: state.isLoadingMore,
-          errorMessage:
-              state.status == SectionStatus.failure ? state.errorMessage : null,
-          onRetry: () => context.read<DashboardCubit>().load(),
-          onLoadMore: () => context.read<DashboardCubit>().loadMoreActivities(),
+        return RepaintBoundary(
+          child: RecentActivityPanel(
+            groups: state.groups,
+            isLoading: state.status == SectionStatus.loading ||
+                state.status == SectionStatus.initial,
+            hasMore: state.hasMore,
+            isLoadingMore: state.isLoadingMore,
+            errorMessage: state.status == SectionStatus.failure
+                ? state.errorMessage
+                : null,
+            onRetry: () => context.read<DashboardCubit>().load(forceRefresh: true),
+            onLoadMore: () => context.read<DashboardCubit>().loadMoreActivities(),
+          ),
         );
       },
     );

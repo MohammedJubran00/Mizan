@@ -1,5 +1,7 @@
 import { prisma } from '../../config/prisma';
-import { PassthroughDashboardCache } from './cache/dashboard-cache';
+import { CacheInvalidator } from '../../shared/cache/cache-invalidator';
+import { MemorySmartCache } from '../../shared/cache/memory-smart-cache';
+import { SmartDashboardCache } from './cache/dashboard-cache';
 import { DashboardController } from './controllers/dashboard.controller';
 import { DashboardAggregator } from './aggregation/dashboard-aggregator';
 import { DashboardMapper } from './mapper/dashboard.mapper';
@@ -37,6 +39,9 @@ import { NotificationSummaryService } from './timeline/services/notification-sum
 import { PriorityCalculationService } from './timeline/services/priority-calculation.service';
 import { TimelineOrchestratorService } from './timeline/services/timeline-orchestrator.service';
 
+/** Shared Smart Cache instance for the process (workspace-isolated entries). */
+const sharedSmartCache = new MemorySmartCache({ maxEntries: 5_000 });
+
 export function buildDashboardModule() {
   const caseRepository = new DashboardCaseRepository(prisma);
   const clientRepository = new DashboardClientRepository(prisma);
@@ -51,8 +56,16 @@ export function buildDashboardModule() {
   const timelineActivityRepository = new TimelineActivityRepository(prisma);
   const timelineAlertRepository = new TimelineAlertRepository(prisma);
 
-  const activityEngine = new ActivityEngineService(activityRepository);
-  const billingService = new BillingService(prisma, activityEngine);
+  const cacheInvalidator = new CacheInvalidator(sharedSmartCache);
+  const activityEngine = new ActivityEngineService(
+    activityRepository,
+    cacheInvalidator,
+  );
+  const billingService = new BillingService(
+    prisma,
+    activityEngine,
+    cacheInvalidator,
+  );
   const revenueAnalyticsService = new RevenueAnalyticsService(
     revenueAnalyticsRepository,
   );
@@ -97,7 +110,7 @@ export function buildDashboardModule() {
   const greetingService = new GreetingService();
   const aggregator = new DashboardAggregator(dashboardStatistics);
   const mapper = new DashboardMapper();
-  const cache = new PassthroughDashboardCache();
+  const cache = new SmartDashboardCache(sharedSmartCache);
 
   const dashboardService = new DashboardService(
     greetingService,
@@ -117,5 +130,7 @@ export function buildDashboardModule() {
     timelineOrchestrator,
     billingRepository,
     invoiceRepository,
+    cacheInvalidator,
+    smartCache: sharedSmartCache,
   };
 }

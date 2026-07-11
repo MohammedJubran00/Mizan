@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 
 import type { PrismaClient, RevenueCategory } from '@prisma/client';
 
+import type { CacheInvalidator } from '../../../shared/cache/cache-invalidator';
 import type { ActivityEngineService } from '../statistics/activity-engine.service';
 
 export interface RecordManualRevenueInput {
@@ -38,6 +39,7 @@ export class BillingService {
   constructor(
     private readonly db: PrismaClient,
     private readonly activityEngine?: ActivityEngineService,
+    private readonly cacheInvalidator?: CacheInvalidator,
   ) {}
 
   /**
@@ -105,6 +107,11 @@ export class BillingService {
         currency,
         targetId: manualRevenueId,
       });
+    } else if (this.cacheInvalidator) {
+      await this.cacheInvalidator.invalidateForMutation(
+        input.workspaceId,
+        'REVENUE_ADDED',
+      );
     }
 
     return { manualRevenueId, billingId };
@@ -169,6 +176,11 @@ export class BillingService {
         currency,
         targetId: input.invoiceId,
       });
+    } else if (this.cacheInvalidator) {
+      await this.cacheInvalidator.invalidateForMutation(
+        input.workspaceId,
+        'INVOICE_PAID',
+      );
     }
 
     return { billingId };

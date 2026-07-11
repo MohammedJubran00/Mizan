@@ -1,9 +1,11 @@
 import { createHash } from 'crypto';
 
 import { AppError } from '../../../shared/errors/AppError';
+import { createLogger } from '../../../shared/observability/logger';
 import type { AuthContext } from '../../../shared/types/auth-context';
 import {
   buildDashboardCacheKey,
+  DASHBOARD_CACHE_TTL_SECONDS,
   type DashboardCache,
 } from '../cache/dashboard-cache';
 import type { DashboardResponseDto } from '../dto';
@@ -13,8 +15,11 @@ import type { RevenueFilterInput } from '../revenue/filters/revenue-filter';
 import type { TimelineFilterInput } from '../timeline/filters/timeline-filter';
 import type { GreetingService } from '../statistics/greeting.service';
 
+const log = createLogger('dashboard-service');
+
 /**
  * Application service for the dashboard aggregation API.
+ * Uses Smart Cache with request deduplication and workspace isolation.
  */
 export class DashboardService {
   constructor(
@@ -33,14 +38,28 @@ export class DashboardService {
       throw new AppError(403, 'Workspace context is required.');
     }
 
+    const workspaceId = auth.workspaceId;
     const filterDigest = digestFilters(revenueFilter, timelineFilter);
-    const cacheKey = buildDashboardCacheKey(auth.workspaceId, filterDigest);
+    const cacheKey = buildDashboardCacheKey(workspaceId, filterDigest);
 
-    const cached = await this.cache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
+    return log.timed(
+      'dashboard_aggregate',
+      { workspaceId, cacheKey, filterDigest: filterDigest ?? 'default' },
+      () =>
+        this.cache.getOrLoad(
+          cacheKey,
+          workspaceId,
+          () => this.loadFresh(auth, revenueFilter, timelineFilter),
+          DASHBOARD_CACHE_TTL_SECONDS,
+        ),
+    );
+  }
 
+  private async loadFresh(
+    auth: AuthContext,
+    revenueFilter: RevenueFilterInput,
+    timelineFilter?: TimelineFilterInput,
+  ): Promise<DashboardResponseDto> {
     const now = new Date();
     const greeting = this.greetingService.build(
       auth.user.fullName,
@@ -55,11 +74,7 @@ export class DashboardService {
       timelineFilter,
     );
     const composed = this.aggregator.compose(auth, parts);
-    const response = this.mapper.toResponse(composed);
-
-    await this.cache.set(cacheKey, response);
-
-    return response;
+    return this.mapper.toResponse(composed);
   }
 }
 

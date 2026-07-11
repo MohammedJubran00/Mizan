@@ -1,11 +1,13 @@
 import 'package:dio/dio.dart';
 
+import '../cache/smart_cache.dart';
 import '../storage/session_storage.dart';
 import '../storage/token_storage.dart';
 import 'api_config.dart';
 import 'api_exception.dart';
+import 'retry_interceptor.dart';
 
-/// Thin Dio wrapper — no business logic, only transport.
+/// Thin Dio wrapper — transport only (auth headers, retry, cancel).
 class ApiClient {
   ApiClient({
     Dio? dio,
@@ -23,6 +25,7 @@ class ApiClient {
                 headers: const {
                   'Content-Type': 'application/json',
                   'Accept': 'application/json',
+                  'Accept-Encoding': 'gzip',
                 },
               ),
             ) {
@@ -41,6 +44,7 @@ class ApiClient {
         },
       ),
     );
+    _dio.interceptors.add(RetryInterceptor());
   }
 
   final Dio _dio;
@@ -53,12 +57,14 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? queryParameters,
     CancelToken? cancelToken,
+    Options? options,
   }) async {
     try {
       return await _dio.get<T>(
         path,
         queryParameters: queryParameters,
         cancelToken: cancelToken,
+        options: options,
       );
     } on DioException catch (e) {
       throw _mapDioException(e);
@@ -97,6 +103,7 @@ class ApiClient {
     if (e.type == DioExceptionType.connectionError) {
       return const ApiException(
         message: 'Unable to reach the server. Check your connection.',
+        offline: true,
       );
     }
 
@@ -133,3 +140,6 @@ class ApiClient {
     );
   }
 }
+
+/// Shared process-level Smart Cache for repository-layer caching.
+final appSmartCache = SmartCache(maxEntries: 512);

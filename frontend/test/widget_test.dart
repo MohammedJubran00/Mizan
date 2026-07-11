@@ -1,30 +1,38 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:frontend/core/router/app_router.dart';
+import 'package:frontend/core/session/session_cubit.dart';
+import 'package:frontend/core/storage/session_storage.dart';
+import 'package:frontend/core/storage/token_storage.dart';
+import 'package:frontend/core/theme/theme_cubit.dart';
+import 'package:frontend/features/dashboard/presentation/cubit/sidebar_cubit.dart';
 import 'package:frontend/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Onboarding renders welcome screen', (tester) async {
+    final sessionCubit = SessionCubit(
+      sessionStorage: SessionStorage(),
+      tokenStorage: TokenStorage(),
+    );
+    final themeCubit = ThemeCubit();
+    final sidebarCubit = SidebarCubit();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MizanApp(
+        router: createAppRouter(),
+        sessionCubit: sessionCubit,
+        themeCubit: themeCubit,
+        sidebarCubit: sidebarCubit,
+      ),
+    );
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('Welcome to Mizan'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('Skip'), findsOneWidget);
+    expect(find.text('Mizan'), findsWidgets);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    await sessionCubit.close();
+    await themeCubit.close();
+    await sidebarCubit.close();
   });
 }

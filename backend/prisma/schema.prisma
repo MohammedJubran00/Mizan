@@ -1,0 +1,466 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  LAWYER
+  ASSISTANT
+  MEMBER
+}
+
+enum CaseStatus {
+  DRAFT
+  PENDING
+  OPEN
+  ACTIVE
+  CLOSED
+  WON
+  LOST
+}
+
+enum HearingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  ADJOURNED
+  RESCHEDULED
+}
+
+enum HearingType {
+  PRELIMINARY
+  TRIAL
+  MOTION
+  MEDIATION
+  ARBITRATION
+  STATUS_CONFERENCE
+  OTHER
+}
+
+enum DeadlineStatus {
+  PENDING
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum DeadlineType {
+  CASE
+  COURT
+  EVIDENCE
+  APPEAL
+  DOCUMENT
+  CONTRACT
+  INTERNAL
+  OTHER
+}
+
+enum DeadlineImportance {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ActivitySeverity {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+  REFUNDED
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BillingSource {
+  INVOICE
+  MANUAL
+  /// Reserved for Stripe / future payment providers.
+  PROVIDER
+}
+
+enum RevenueCategory {
+  INVOICE_PAYMENT
+  MANUAL
+  CONSULTATION
+  COURT_FEE
+  RETAINER
+  SUBSCRIPTION
+  OTHER
+}
+
+enum BillingStatus {
+  POSTED
+  PENDING
+  CANCELLED
+  REFUNDED
+}
+
+enum ActivityType {
+  CASE_CREATED
+  CASE_UPDATED
+  CASE_CLOSED
+  CASE_ASSIGNED
+  CLIENT_ADDED
+  CLIENT_UPDATED
+  INVOICE_CREATED
+  INVOICE_PAID
+  REVENUE_ADDED
+  DOCUMENT_UPLOADED
+  DOCUMENT_DELETED
+  HEARING_SCHEDULED
+  HEARING_UPDATED
+  DEADLINE_ADDED
+  DEADLINE_UPDATED
+  TASK_COMPLETED
+  USER_CREATED
+  USER_UPDATED
+  USER_INVITED
+  USER_REMOVED
+  ROLE_CHANGED
+  WORKSPACE_UPDATED
+  THEME_CHANGED
+  PROFILE_UPDATED
+  LOGIN
+  LOGOUT
+  NOTE
+  OTHER
+}
+
+model User {
+  id           String   @id @default(uuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships         WorkspaceMember[]
+  activities          Activity[]
+  assignedCases       Case[]              @relation("CaseAssignee")
+  assignedHearings    Hearing[]           @relation("HearingLawyer")
+  billableHourEntries BillableHourEntry[]
+  manualRevenues      ManualRevenue[]
+  billingsAsLawyer    Billing[]           @relation("BillingLawyer")
+
+  @@map("users")
+}
+
+/// Independent SaaS tenant. All operational data is scoped by workspaceId.
+model Workspace {
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
+  /// IANA timezone used for all dashboard period calculations (e.g. Asia/Riyadh).
+  timezone        String   @default("UTC")
+  /// Default reporting currency (multi-currency ready).
+  defaultCurrency String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  members             WorkspaceMember[]
+  clients             Client[]
+  cases               Case[]
+  hearings            Hearing[]
+  deadlines           Deadline[]
+  invoices            Invoice[]
+  activities          Activity[]
+  billings            Billing[]
+  manualRevenues      ManualRevenue[]
+  billableHourEntries BillableHourEntry[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([workspaceId, role])
+  @@index([workspaceId, isActive])
+  @@map("workspace_members")
+}
+
+model Client {
+  id             String       @id @default(uuid())
+  workspaceId    String
+  name           String
+  email          String?
+  phone          String?
+  status         ClientStatus @default(ACTIVE)
+  lastActivityAt DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases          Case[]
+  invoices       Invoice[]
+  billings       Billing[]
+  manualRevenues ManualRevenue[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
+  @@map("clients")
+}
+
+model Case {
+  id               String     @id @default(uuid())
+  workspaceId      String
+  clientId         String?
+  assignedToUserId String?
+  title            String
+  caseNumber       String?
+  status           CaseStatus @default(OPEN)
+  practiceArea     String?
+  billableHours    Decimal    @default(0) @db.Decimal(12, 2)
+  openedAt         DateTime   @default(now())
+  closedAt         DateTime?
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client              Client?             @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  assignedTo          User?               @relation("CaseAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  hearings            Hearing[]
+  deadlines           Deadline[]
+  invoices            Invoice[]
+  billableHourEntries BillableHourEntry[]
+  billings            Billing[]
+  manualRevenues      ManualRevenue[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, practiceArea])
+  @@index([workspaceId, assignedToUserId])
+  @@index([workspaceId, caseNumber])
+  @@index([clientId])
+  @@index([assignedToUserId])
+  @@map("cases")
+}
+
+model Hearing {
+  id               String        @id @default(uuid())
+  workspaceId      String
+  caseId           String?
+  title            String
+  hearingType      HearingType   @default(OTHER)
+  scheduledAt      DateTime
+  status           HearingStatus @default(SCHEDULED)
+  location         String?
+  courtName        String?
+  assignedLawyerId String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case           Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  assignedLawyer User?     @relation("HearingLawyer", fields: [assignedLawyerId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, scheduledAt])
+  @@index([workspaceId, status, scheduledAt])
+  @@index([workspaceId, hearingType])
+  @@index([caseId])
+  @@index([assignedLawyerId])
+  @@map("hearings")
+}
+
+model Deadline {
+  id          String             @id @default(uuid())
+  workspaceId String
+  caseId      String?
+  title       String
+  type        DeadlineType       @default(CASE)
+  importance  DeadlineImportance @default(MEDIUM)
+  dueAt       DateTime
+  status      DeadlineStatus     @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, dueAt])
+  @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, type])
+  @@index([workspaceId, importance])
+  @@index([caseId])
+  @@map("deadlines")
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  workspaceId String
+  clientId    String?
+  caseId      String?
+  amount      Decimal       @db.Decimal(14, 2)
+  currency    String        @default("USD")
+  status      InvoiceStatus @default(DRAFT)
+  issuedAt    DateTime      @default(now())
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  billing   Billing?
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, paidAt])
+  @@index([workspaceId, issuedAt])
+  @@index([clientId])
+  @@index([caseId])
+  @@map("invoices")
+}
+
+/// Single financial source of truth. Paid invoices, manual revenue, and providers land here.
+model Billing {
+  id              String          @id @default(uuid())
+  workspaceId     String
+  amount          Decimal         @db.Decimal(14, 2)
+  currency        String          @default("USD")
+  source          BillingSource
+  category        RevenueCategory @default(OTHER)
+  status          BillingStatus   @default(POSTED)
+  invoiceId       String?         @unique
+  manualRevenueId String?         @unique
+  clientId        String?
+  caseId          String?
+  lawyerUserId    String?
+  occurredAt      DateTime
+  description     String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invoice       Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  manualRevenue ManualRevenue? @relation(fields: [manualRevenueId], references: [id], onDelete: Cascade)
+  client        Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case          Case?          @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  lawyer        User?          @relation("BillingLawyer", fields: [lawyerUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, source])
+  @@index([workspaceId, category])
+  @@index([workspaceId, status])
+  @@index([workspaceId, currency])
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, caseId])
+  @@index([workspaceId, lawyerUserId])
+  @@index([workspaceId, status, occurredAt])
+  @@index([createdAt])
+  @@map("billings")
+}
+
+/// Manual revenue entry — always mirrored into Billing on create.
+model ManualRevenue {
+  id          String          @id @default(uuid())
+  workspaceId String
+  amount      Decimal         @db.Decimal(14, 2)
+  currency    String          @default("USD")
+  category    RevenueCategory @default(MANUAL)
+  description String?
+  clientId    String?
+  caseId      String?
+  occurredAt  DateTime        @default(now())
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  billing   Billing?
+
+  @@index([workspaceId])
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, category])
+  @@map("manual_revenues")
+}
+
+/// Time-entry style billable hours for period-based statistics.
+model BillableHourEntry {
+  id          String   @id @default(uuid())
+  workspaceId String
+  caseId      String?
+  userId      String?
+  hours       Decimal  @db.Decimal(12, 2)
+  workedAt    DateTime
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, workedAt])
+  @@index([caseId])
+  @@index([userId])
+  @@map("billable_hour_entries")
+}
+
+model Activity {
+  id          String           @id @default(uuid())
+  workspaceId String
+  /// Actor who performed the action (nullable for system events).
+  userId      String?
+  type        ActivityType     @default(OTHER)
+  /// Short action label / title.
+  title       String
+  description String?
+  entityType  String?
+  entityId    String?
+  targetName  String?
+  severity    ActivitySeverity @default(INFO)
+  icon        String?
+  color       String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, type])
+  @@index([workspaceId, type, createdAt])
+  @@index([userId])
+  @@map("activities")
+}

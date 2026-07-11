@@ -10,8 +10,6 @@ import {
 } from './repositories/dashboard-billing.repository';
 import { DashboardCaseRepository } from './repositories/dashboard-case.repository';
 import { DashboardClientRepository } from './repositories/dashboard-client.repository';
-import { DashboardDeadlineRepository } from './repositories/dashboard-deadline.repository';
-import { DashboardHearingRepository } from './repositories/dashboard-hearing.repository';
 import { DashboardTeamRepository } from './repositories/dashboard-team.repository';
 import { RevenueAnalyticsRepository } from './revenue/repositories/revenue-analytics.repository';
 import { RevenueAnalyticsService } from './revenue/services/revenue-analytics.service';
@@ -19,26 +17,39 @@ import { createDashboardRouter } from './routes/dashboard.routes';
 import { BillingService } from './services/billing.service';
 import { DashboardService } from './services/dashboard.service';
 import { ActivityEngineService } from './statistics/activity-engine.service';
-import { ActivityStatisticsService } from './statistics/activity-statistics.service';
 import { CaseStatisticsService } from './statistics/case-statistics.service';
 import { ClientStatisticsService } from './statistics/client-statistics.service';
 import { DashboardStatisticsService } from './statistics/dashboard-statistics.service';
-import { DeadlineStatisticsService } from './statistics/deadline-statistics.service';
 import { GreetingService } from './statistics/greeting.service';
-import { HearingStatisticsService } from './statistics/hearing-statistics.service';
 import { RevenueStatisticsService } from './statistics/revenue-statistics.service';
 import { TeamStatisticsService } from './statistics/team-statistics.service';
+import { TimelineActivityRepository } from './timeline/repositories/timeline-activity-alert.repository';
+import { TimelineAlertRepository } from './timeline/repositories/timeline-activity-alert.repository';
+import {
+  TimelineDeadlineRepository,
+  TimelineHearingRepository,
+} from './timeline/repositories/timeline-hearing-deadline.repository';
+import { ActivityTimelineService } from './timeline/services/activity-timeline.service';
+import { AlertEngineService } from './timeline/services/alert-engine.service';
+import { DeadlineEngineService } from './timeline/services/deadline-engine.service';
+import { HearingEngineService } from './timeline/services/hearing-engine.service';
+import { NotificationSummaryService } from './timeline/services/notification-summary.service';
+import { PriorityCalculationService } from './timeline/services/priority-calculation.service';
+import { TimelineOrchestratorService } from './timeline/services/timeline-orchestrator.service';
 
 export function buildDashboardModule() {
   const caseRepository = new DashboardCaseRepository(prisma);
   const clientRepository = new DashboardClientRepository(prisma);
-  const hearingRepository = new DashboardHearingRepository(prisma);
-  const deadlineRepository = new DashboardDeadlineRepository(prisma);
-  const billingRepository = new DashboardBillingRepository(prisma);
-  const invoiceRepository = new DashboardInvoiceRepository(prisma);
   const activityRepository = new DashboardActivityRepository(prisma);
   const teamRepository = new DashboardTeamRepository(prisma);
+  const billingRepository = new DashboardBillingRepository(prisma);
+  const invoiceRepository = new DashboardInvoiceRepository(prisma);
   const revenueAnalyticsRepository = new RevenueAnalyticsRepository(prisma);
+
+  const timelineHearingRepository = new TimelineHearingRepository(prisma);
+  const timelineDeadlineRepository = new TimelineDeadlineRepository(prisma);
+  const timelineActivityRepository = new TimelineActivityRepository(prisma);
+  const timelineAlertRepository = new TimelineAlertRepository(prisma);
 
   const activityEngine = new ActivityEngineService(activityRepository);
   const billingService = new BillingService(prisma, activityEngine);
@@ -46,21 +57,40 @@ export function buildDashboardModule() {
     revenueAnalyticsRepository,
   );
 
+  const priorityService = new PriorityCalculationService();
+  const hearingEngine = new HearingEngineService(
+    timelineHearingRepository,
+    priorityService,
+  );
+  const deadlineEngine = new DeadlineEngineService(
+    timelineDeadlineRepository,
+    priorityService,
+  );
+  const activityTimeline = new ActivityTimelineService(timelineActivityRepository);
+  const alertEngine = new AlertEngineService(timelineAlertRepository);
+  const notificationSummary = new NotificationSummaryService(
+    timelineHearingRepository,
+    timelineDeadlineRepository,
+    timelineAlertRepository,
+  );
+  const timelineOrchestrator = new TimelineOrchestratorService(
+    hearingEngine,
+    deadlineEngine,
+    activityTimeline,
+    alertEngine,
+    notificationSummary,
+  );
+
   const caseStatistics = new CaseStatisticsService(caseRepository);
   const clientStatistics = new ClientStatisticsService(clientRepository);
   const revenueStatistics = new RevenueStatisticsService(revenueAnalyticsService);
-  const hearingStatistics = new HearingStatisticsService(hearingRepository);
-  const deadlineStatistics = new DeadlineStatisticsService(deadlineRepository);
-  const activityStatistics = new ActivityStatisticsService(activityEngine);
   const teamStatistics = new TeamStatisticsService(teamRepository, caseRepository);
 
   const dashboardStatistics = new DashboardStatisticsService(
     caseStatistics,
     clientStatistics,
     revenueStatistics,
-    hearingStatistics,
-    deadlineStatistics,
-    activityStatistics,
+    timelineOrchestrator,
     teamStatistics,
   );
 
@@ -84,7 +114,7 @@ export function buildDashboardModule() {
     billingService,
     activityEngine,
     revenueAnalyticsService,
-    // Keep legacy repos available for internal tooling / future modules.
+    timelineOrchestrator,
     billingRepository,
     invoiceRepository,
   };

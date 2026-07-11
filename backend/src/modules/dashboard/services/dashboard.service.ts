@@ -10,6 +10,7 @@ import type { DashboardResponseDto } from '../dto';
 import type { DashboardAggregator } from '../aggregation/dashboard-aggregator';
 import type { DashboardMapper } from '../mapper/dashboard.mapper';
 import type { RevenueFilterInput } from '../revenue/filters/revenue-filter';
+import type { TimelineFilterInput } from '../timeline/filters/timeline-filter';
 import type { GreetingService } from '../statistics/greeting.service';
 
 /**
@@ -26,12 +27,13 @@ export class DashboardService {
   async getDashboard(
     auth: AuthContext,
     revenueFilter: RevenueFilterInput = { topLimit: 5 },
+    timelineFilter?: TimelineFilterInput,
   ): Promise<DashboardResponseDto> {
     if (!auth.workspaceId) {
       throw new AppError(403, 'Workspace context is required.');
     }
 
-    const filterDigest = digestFilters(revenueFilter);
+    const filterDigest = digestFilters(revenueFilter, timelineFilter);
     const cacheKey = buildDashboardCacheKey(auth.workspaceId, filterDigest);
 
     const cached = await this.cache.get(cacheKey);
@@ -50,6 +52,7 @@ export class DashboardService {
       greeting,
       now,
       revenueFilter,
+      timelineFilter,
     );
     const composed = this.aggregator.compose(auth, parts);
     const response = this.mapper.toResponse(composed);
@@ -60,31 +63,19 @@ export class DashboardService {
   }
 }
 
-function digestFilters(filter: RevenueFilterInput): string | undefined {
-  const meaningful = {
-    dateFrom: filter.dateFrom?.toISOString() ?? null,
-    dateTo: filter.dateTo?.toISOString() ?? null,
-    practiceArea: filter.practiceArea ?? null,
-    lawyerId: filter.lawyerId ?? null,
-    caseType: filter.caseType ?? null,
-    clientId: filter.clientId ?? null,
-    currency: filter.currency ?? null,
-    source: filter.source ?? null,
-    category: filter.category ?? null,
-    status: filter.status ?? null,
-    topLimit: filter.topLimit ?? 5,
+function digestFilters(
+  revenueFilter: RevenueFilterInput,
+  timelineFilter?: TimelineFilterInput,
+): string | undefined {
+  const payload = {
+    revenue: revenueFilter,
+    timeline: timelineFilter ?? null,
   };
 
-  const hasFilter = Object.entries(meaningful).some(([key, value]) => {
-    if (key === 'topLimit') {
-      return value !== 5;
-    }
-    return value != null;
-  });
-
-  if (!hasFilter) {
+  const serialized = JSON.stringify(payload);
+  if (serialized === JSON.stringify({ revenue: { topLimit: 5 }, timeline: null })) {
     return undefined;
   }
 
-  return createHash('sha1').update(JSON.stringify(meaningful)).digest('hex').slice(0, 12);
+  return createHash('sha1').update(serialized).digest('hex').slice(0, 12);
 }

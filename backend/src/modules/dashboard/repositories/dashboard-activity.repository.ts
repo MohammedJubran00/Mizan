@@ -1,4 +1,9 @@
-import type { ActivityType, PrismaClient } from '@prisma/client';
+import type {
+  ActivitySeverity,
+  ActivityType,
+  Prisma,
+  PrismaClient,
+} from '@prisma/client';
 
 export interface ActivityProjection {
   id: string;
@@ -8,12 +13,18 @@ export interface ActivityProjection {
   description: string | null;
   entityType: string | null;
   entityId: string | null;
+  targetName: string | null;
+  severity: ActivitySeverity;
+  icon: string | null;
+  color: string | null;
+  metadata: Prisma.JsonValue | null;
   userId: string | null;
   createdAt: Date;
   actor: {
     id: string;
     fullName: string;
     email: string;
+    avatarUrl: string | null;
   } | null;
 }
 
@@ -25,6 +36,11 @@ export interface RecordActivityInput {
   description?: string | null;
   targetType?: string | null;
   targetId?: string | null;
+  targetName?: string | null;
+  severity?: ActivitySeverity;
+  icon?: string | null;
+  color?: string | null;
+  metadata?: Prisma.InputJsonValue;
 }
 
 export class DashboardActivityRepository {
@@ -48,6 +64,11 @@ export class DashboardActivityRepository {
         description: true,
         entityType: true,
         entityId: true,
+        targetName: true,
+        severity: true,
+        icon: true,
+        color: true,
+        metadata: true,
         userId: true,
         createdAt: true,
         user: {
@@ -55,6 +76,7 @@ export class DashboardActivityRepository {
             id: true,
             fullName: true,
             email: true,
+            avatarUrl: true,
           },
         },
       },
@@ -63,22 +85,8 @@ export class DashboardActivityRepository {
     });
 
     return rows.map((row) => ({
-      id: row.id,
-      workspaceId: row.workspaceId,
-      type: row.type,
-      title: row.title,
-      description: row.description,
-      entityType: row.entityType,
-      entityId: row.entityId,
-      userId: row.userId,
-      createdAt: row.createdAt,
-      actor: row.user
-        ? {
-            id: row.user.id,
-            fullName: row.user.fullName,
-            email: row.user.email,
-          }
-        : null,
+      ...row,
+      actor: row.user,
     }));
   }
 
@@ -92,6 +100,11 @@ export class DashboardActivityRepository {
         description: input.description ?? null,
         entityType: input.targetType ?? null,
         entityId: input.targetId ?? null,
+        targetName: input.targetName ?? null,
+        severity: input.severity ?? 'INFO',
+        icon: input.icon ?? null,
+        color: input.color ?? null,
+        metadata: input.metadata ?? undefined,
       },
       select: {
         id: true,
@@ -101,6 +114,11 @@ export class DashboardActivityRepository {
         description: true,
         entityType: true,
         entityId: true,
+        targetName: true,
+        severity: true,
+        icon: true,
+        color: true,
+        metadata: true,
         userId: true,
         createdAt: true,
         user: {
@@ -108,28 +126,15 @@ export class DashboardActivityRepository {
             id: true,
             fullName: true,
             email: true,
+            avatarUrl: true,
           },
         },
       },
     });
 
     return {
-      id: row.id,
-      workspaceId: row.workspaceId,
-      type: row.type,
-      title: row.title,
-      description: row.description,
-      entityType: row.entityType,
-      entityId: row.entityId,
-      userId: row.userId,
-      createdAt: row.createdAt,
-      actor: row.user
-        ? {
-            id: row.user.id,
-            fullName: row.user.fullName,
-            email: row.user.email,
-          }
-        : null,
+      ...row,
+      actor: row.user,
     };
   }
 }

@@ -1,4 +1,4 @@
-import type { ActivityType } from '@prisma/client';
+import type { ActivitySeverity, ActivityType, Prisma } from '@prisma/client';
 
 import type { ActivitiesDto, ActivityItemDto } from '../dto';
 import type {
@@ -14,11 +14,17 @@ export interface ActivityEventInput {
   description?: string | null;
   targetType?: string | null;
   targetId?: string | null;
+  targetName?: string | null;
+  severity?: ActivitySeverity;
+  icon?: string | null;
+  color?: string | null;
+  metadata?: Prisma.InputJsonValue;
 }
 
 /**
- * Reusable Activity / Audit engine.
- * Records workspace-scoped events and exposes recent-activity statistics.
+ * Reusable Activity publisher / audit-ready engine.
+ * Future modules publish events here without coupling to the Dashboard.
+ * The Dashboard timeline consumes via ActivityTimelineService.
  */
 export class ActivityEngineService {
   constructor(private readonly activityRepository: DashboardActivityRepository) {}
@@ -42,6 +48,9 @@ export class ActivityEngineService {
       description: `Case "${params.title}" was created.`,
       targetType: 'case',
       targetId: params.caseId,
+      targetName: params.title,
+      icon: 'case',
+      color: '#2563EB',
     });
   }
 
@@ -59,6 +68,7 @@ export class ActivityEngineService {
       description: `Case "${params.title}" was updated.`,
       targetType: 'case',
       targetId: params.caseId,
+      targetName: params.title,
     });
   }
 
@@ -76,6 +86,10 @@ export class ActivityEngineService {
       description: `Case "${params.title}" was closed.`,
       targetType: 'case',
       targetId: params.caseId,
+      targetName: params.title,
+      severity: 'SUCCESS',
+      icon: 'case-check',
+      color: '#16A34A',
     });
   }
 
@@ -94,6 +108,7 @@ export class ActivityEngineService {
       description: `Case "${params.title}" assigned to ${params.assigneeName}.`,
       targetType: 'case',
       targetId: params.caseId,
+      targetName: params.title,
     });
   }
 
@@ -111,6 +126,25 @@ export class ActivityEngineService {
       description: `Client "${params.name}" was added.`,
       targetType: 'client',
       targetId: params.clientId,
+      targetName: params.name,
+    });
+  }
+
+  async recordClientUpdated(params: {
+    workspaceId: string;
+    actorId?: string;
+    clientId: string;
+    name: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'CLIENT_UPDATED',
+      title: `Client updated: ${params.name}`,
+      description: `Client "${params.name}" was updated.`,
+      targetType: 'client',
+      targetId: params.clientId,
+      targetName: params.name,
     });
   }
 
@@ -129,6 +163,7 @@ export class ActivityEngineService {
       description: `Invoice for ${params.currency} ${params.amount} was created.`,
       targetType: 'invoice',
       targetId: params.invoiceId,
+      targetName: `Invoice ${params.invoiceId.slice(0, 8)}`,
     });
   }
 
@@ -147,6 +182,7 @@ export class ActivityEngineService {
       description: `Invoice payment of ${params.currency} ${params.amount} recorded.`,
       targetType: 'invoice',
       targetId: params.targetId,
+      severity: 'SUCCESS',
     });
   }
 
@@ -165,6 +201,7 @@ export class ActivityEngineService {
       description: `Manual revenue of ${params.currency} ${params.amount} was added.`,
       targetType: 'manual_revenue',
       targetId: params.targetId,
+      severity: 'SUCCESS',
     });
   }
 
@@ -182,6 +219,26 @@ export class ActivityEngineService {
       description: `Document "${params.name}" was uploaded.`,
       targetType: 'document',
       targetId: params.documentId,
+      targetName: params.name,
+    });
+  }
+
+  async recordDocumentDeleted(params: {
+    workspaceId: string;
+    actorId?: string;
+    documentId: string;
+    name: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'DOCUMENT_DELETED',
+      title: `Document deleted: ${params.name}`,
+      description: `Document "${params.name}" was deleted.`,
+      targetType: 'document',
+      targetId: params.documentId,
+      targetName: params.name,
+      severity: 'WARNING',
     });
   }
 
@@ -199,6 +256,26 @@ export class ActivityEngineService {
       description: `Hearing "${params.title}" was scheduled.`,
       targetType: 'hearing',
       targetId: params.hearingId,
+      targetName: params.title,
+      severity: 'WARNING',
+    });
+  }
+
+  async recordHearingUpdated(params: {
+    workspaceId: string;
+    actorId?: string;
+    hearingId: string;
+    title: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'HEARING_UPDATED',
+      title: `Hearing updated: ${params.title}`,
+      description: `Hearing "${params.title}" was updated.`,
+      targetType: 'hearing',
+      targetId: params.hearingId,
+      targetName: params.title,
     });
   }
 
@@ -216,6 +293,26 @@ export class ActivityEngineService {
       description: `Deadline "${params.title}" was updated.`,
       targetType: 'deadline',
       targetId: params.deadlineId,
+      targetName: params.title,
+    });
+  }
+
+  async recordTaskCompleted(params: {
+    workspaceId: string;
+    actorId?: string;
+    taskId: string;
+    title: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'TASK_COMPLETED',
+      title: `Task completed: ${params.title}`,
+      description: `Task "${params.title}" was completed.`,
+      targetType: 'task',
+      targetId: params.taskId,
+      targetName: params.title,
+      severity: 'SUCCESS',
     });
   }
 
@@ -233,6 +330,7 @@ export class ActivityEngineService {
       description: `User "${params.fullName}" was created.`,
       targetType: 'user',
       targetId: params.userId,
+      targetName: params.fullName,
     });
   }
 
@@ -250,6 +348,44 @@ export class ActivityEngineService {
       description: `User "${params.fullName}" was updated.`,
       targetType: 'user',
       targetId: params.userId,
+      targetName: params.fullName,
+    });
+  }
+
+  async recordUserInvited(params: {
+    workspaceId: string;
+    actorId?: string;
+    userId: string;
+    fullName: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'USER_INVITED',
+      title: `User invited: ${params.fullName}`,
+      description: `User "${params.fullName}" was invited.`,
+      targetType: 'user',
+      targetId: params.userId,
+      targetName: params.fullName,
+    });
+  }
+
+  async recordUserRemoved(params: {
+    workspaceId: string;
+    actorId?: string;
+    userId: string;
+    fullName: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'USER_REMOVED',
+      title: `User removed: ${params.fullName}`,
+      description: `User "${params.fullName}" was removed.`,
+      targetType: 'user',
+      targetId: params.userId,
+      targetName: params.fullName,
+      severity: 'WARNING',
     });
   }
 
@@ -268,6 +404,7 @@ export class ActivityEngineService {
       description: `Role for "${params.fullName}" changed to ${params.role}.`,
       targetType: 'user',
       targetId: params.userId,
+      targetName: params.fullName,
     });
   }
 
@@ -284,9 +421,74 @@ export class ActivityEngineService {
       description: `Workspace "${params.name}" was updated.`,
       targetType: 'workspace',
       targetId: params.workspaceId,
+      targetName: params.name,
     });
   }
 
+  async recordThemeChanged(params: {
+    workspaceId: string;
+    actorId?: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'THEME_CHANGED',
+      title: 'Theme changed',
+      description: 'Workspace theme was updated.',
+      targetType: 'workspace',
+      targetId: params.workspaceId,
+    });
+  }
+
+  async recordProfileUpdated(params: {
+    workspaceId: string;
+    actorId?: string;
+    userId: string;
+    fullName: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'PROFILE_UPDATED',
+      title: `Profile updated: ${params.fullName}`,
+      description: `Profile for "${params.fullName}" was updated.`,
+      targetType: 'user',
+      targetId: params.userId,
+      targetName: params.fullName,
+    });
+  }
+
+  async recordLogin(params: {
+    workspaceId: string;
+    actorId?: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'LOGIN',
+      title: 'User logged in',
+      description: 'A user signed in to the workspace.',
+      targetType: 'workspace',
+      targetId: params.workspaceId,
+    });
+  }
+
+  async recordLogout(params: {
+    workspaceId: string;
+    actorId?: string;
+  }): Promise<ActivityItemDto> {
+    return this.record({
+      workspaceId: params.workspaceId,
+      actorId: params.actorId,
+      type: 'LOGOUT',
+      title: 'User logged out',
+      description: 'A user signed out of the workspace.',
+      targetType: 'workspace',
+      targetId: params.workspaceId,
+    });
+  }
+
+  /** Legacy helper used by older dashboard stats — prefer ActivityTimelineService. */
   async calculateRecent(workspaceId: string, take = 20): Promise<ActivitiesDto> {
     const [total, items] = await Promise.all([
       this.activityRepository.countActivities(workspaceId),
@@ -310,7 +512,7 @@ function mapActivity(row: {
   entityId: string | null;
   userId: string | null;
   createdAt: Date;
-  actor: { id: string; fullName: string; email: string } | null;
+  actor: { id: string; fullName: string; email: string; avatarUrl?: string | null } | null;
 }): ActivityItemDto {
   const timestamp = row.createdAt.toISOString();
 
@@ -320,7 +522,13 @@ function mapActivity(row: {
     action: row.type,
     title: row.title,
     description: row.description,
-    actor: row.actor,
+    actor: row.actor
+      ? {
+          id: row.actor.id,
+          fullName: row.actor.fullName,
+          email: row.actor.email,
+        }
+      : null,
     target:
       row.entityType && row.entityId
         ? { type: row.entityType, id: row.entityId }

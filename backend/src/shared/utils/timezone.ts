@@ -16,8 +16,10 @@ export interface PeriodBounds {
 
 export interface WorkspacePeriods {
   today: PeriodBounds;
+  tomorrow: PeriodBounds;
   yesterday: PeriodBounds;
   thisWeek: PeriodBounds;
+  nextWeek: PeriodBounds;
   lastWeek: PeriodBounds;
   thisMonth: PeriodBounds;
   lastMonth: PeriodBounds;
@@ -196,11 +198,15 @@ export function resolveWorkspacePeriods(
   const nextQuarterStart = startOfMonth(nextQuarterYear, normalizedNextQuarterMonth, tz);
 
   const nextWeekStart = new Date(thisWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const weekAfterNextStart = new Date(nextWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+  const dayAfterTomorrowStart = startOfDay(addDays(parts, 2), tz);
 
   return {
     today: { start: todayStart, end: tomorrowStart },
+    tomorrow: { start: tomorrowStart, end: dayAfterTomorrowStart },
     yesterday: { start: yesterdayStart, end: todayStart },
     thisWeek: { start: thisWeekStart, end: nextWeekStart },
+    nextWeek: { start: nextWeekStart, end: weekAfterNextStart },
     lastWeek: { start: lastWeekStartExact, end: thisWeekStart },
     thisMonth: { start: thisMonthStart, end: nextMonth },
     lastMonth: { start: lastMonthStart, end: thisMonthStart },

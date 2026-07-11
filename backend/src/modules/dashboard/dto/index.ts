@@ -1,6 +1,7 @@
 export type {
   ActiveCasesCardDto,
   ActivitiesDto,
+  ActivitiesDashboardDto,
   ActivityActorDto,
   ActivityItemDto,
   ActivityTargetDto,
@@ -12,15 +13,19 @@ export type {
   ChartsDto,
   ChartSeriesPointDto,
   ClientsCardDto,
+  DashboardAlertsDto,
   DashboardResponseDto,
   DashboardUserDto,
   DashboardWorkspaceDto,
   DeadlineItemDto,
   DeadlinesDto,
+  DeadlinesDashboardDto,
   DeadlineWindowsDto,
   GreetingDto,
   HearingItemDto,
   HearingsDto,
+  HearingsDashboardDto,
+  NotificationSummaryDto,
   OverviewDto,
   RevenueBreakdownDto,
   RevenueCardDto,
@@ -33,4 +38,5 @@ export type {
   TeamRoleCountsDto,
   WinRateCardDto,
 } from './dashboard-response.dto';
+
 

@@ -30,6 +30,17 @@ enum HearingStatus {
   COMPLETED
   CANCELLED
   ADJOURNED
+  RESCHEDULED
+}
+
+enum HearingType {
+  PRELIMINARY
+  TRIAL
+  MOTION
+  MEDIATION
+  ARBITRATION
+  STATUS_CONFERENCE
+  OTHER
 }
 
 enum DeadlineStatus {
@@ -37,6 +48,31 @@ enum DeadlineStatus {
   COMPLETED
   OVERDUE
   CANCELLED
+}
+
+enum DeadlineType {
+  CASE
+  COURT
+  EVIDENCE
+  APPEAL
+  DOCUMENT
+  CONTRACT
+  INTERNAL
+  OTHER
+}
+
+enum DeadlineImportance {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ActivitySeverity {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
 }
 
 enum InvoiceStatus {
@@ -83,17 +119,27 @@ enum ActivityType {
   CASE_CLOSED
   CASE_ASSIGNED
   CLIENT_ADDED
+  CLIENT_UPDATED
   INVOICE_CREATED
   INVOICE_PAID
   REVENUE_ADDED
   DOCUMENT_UPLOADED
+  DOCUMENT_DELETED
   HEARING_SCHEDULED
+  HEARING_UPDATED
   DEADLINE_ADDED
   DEADLINE_UPDATED
+  TASK_COMPLETED
   USER_CREATED
   USER_UPDATED
+  USER_INVITED
+  USER_REMOVED
   ROLE_CHANGED
   WORKSPACE_UPDATED
+  THEME_CHANGED
+  PROFILE_UPDATED
+  LOGIN
+  LOGOUT
   NOTE
   OTHER
 }
@@ -103,12 +149,14 @@ model User {
   fullName     String
   email        String   @unique
   passwordHash String
+  avatarUrl    String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   memberships         WorkspaceMember[]
   activities          Activity[]
   assignedCases       Case[]              @relation("CaseAssignee")
+  assignedHearings    Hearing[]           @relation("HearingLawyer")
   billableHourEntries BillableHourEntry[]
   manualRevenues      ManualRevenue[]
   billingsAsLawyer    Billing[]           @relation("BillingLawyer")
@@ -191,6 +239,7 @@ model Case {
   clientId         String?
   assignedToUserId String?
   title            String
+  caseNumber       String?
   status           CaseStatus @default(OPEN)
   practiceArea     String?
   billableHours    Decimal    @default(0) @db.Decimal(12, 2)
@@ -213,41 +262,50 @@ model Case {
   @@index([workspaceId, status])
   @@index([workspaceId, practiceArea])
   @@index([workspaceId, assignedToUserId])
+  @@index([workspaceId, caseNumber])
   @@index([clientId])
   @@index([assignedToUserId])
   @@map("cases")
 }
 
 model Hearing {
-  id          String        @id @default(uuid())
-  workspaceId String
-  caseId      String?
-  title       String
-  scheduledAt DateTime
-  status      HearingStatus @default(SCHEDULED)
-  location    String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id               String        @id @default(uuid())
+  workspaceId      String
+  caseId           String?
+  title            String
+  hearingType      HearingType   @default(OTHER)
+  scheduledAt      DateTime
+  status           HearingStatus @default(SCHEDULED)
+  location         String?
+  courtName        String?
+  assignedLawyerId String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case           Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  assignedLawyer User?     @relation("HearingLawyer", fields: [assignedLawyerId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([workspaceId, scheduledAt])
   @@index([workspaceId, status, scheduledAt])
+  @@index([workspaceId, hearingType])
   @@index([caseId])
+  @@index([assignedLawyerId])
   @@map("hearings")
 }
 
 model Deadline {
-  id          String         @id @default(uuid())
+  id          String             @id @default(uuid())
   workspaceId String
   caseId      String?
   title       String
+  type        DeadlineType       @default(CASE)
+  importance  DeadlineImportance @default(MEDIUM)
   dueAt       DateTime
-  status      DeadlineStatus @default(PENDING)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  status      DeadlineStatus     @default(PENDING)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
@@ -255,6 +313,8 @@ model Deadline {
   @@index([workspaceId])
   @@index([workspaceId, dueAt])
   @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, type])
+  @@index([workspaceId, importance])
   @@index([caseId])
   @@map("deadlines")
 }
@@ -377,17 +437,22 @@ model BillableHourEntry {
 }
 
 model Activity {
-  id          String       @id @default(uuid())
+  id          String           @id @default(uuid())
   workspaceId String
   /// Actor who performed the action (nullable for system events).
   userId      String?
-  type        ActivityType @default(OTHER)
+  type        ActivityType     @default(OTHER)
   /// Short action label / title.
   title       String
   description String?
   entityType  String?
   entityId    String?
-  createdAt   DateTime     @default(now())
+  targetName  String?
+  severity    ActivitySeverity @default(INFO)
+  icon        String?
+  color       String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -395,6 +460,7 @@ model Activity {
   @@index([workspaceId])
   @@index([workspaceId, createdAt])
   @@index([workspaceId, type])
+  @@index([workspaceId, type, createdAt])
   @@index([userId])
   @@map("activities")
 }

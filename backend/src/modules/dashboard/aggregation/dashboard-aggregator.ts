@@ -1,6 +1,7 @@
 import type { AuthContext } from '../../../shared/types/auth-context';
 import type { DashboardResponseDto, GreetingDto } from '../dto';
 import type { RevenueFilterInput } from '../revenue/filters/revenue-filter';
+import type { TimelineFilterInput } from '../timeline/filters/timeline-filter';
 import type { DashboardStatisticsBundle } from '../statistics/dashboard-statistics.service';
 import type { DashboardStatisticsService } from '../statistics/dashboard-statistics.service';
 
@@ -22,12 +23,14 @@ export class DashboardAggregator {
     greeting: GreetingDto,
     now: Date = new Date(),
     revenueFilter?: RevenueFilterInput,
+    timelineFilter?: TimelineFilterInput,
   ): Promise<AggregatedDashboardParts> {
     const statistics = await this.statisticsService.calculateAll({
       workspaceId: auth.workspaceId,
       timezone: auth.workspaceTimezone,
       now,
       revenueFilter,
+      timelineFilter,
     });
 
     return {
@@ -64,6 +67,8 @@ export class DashboardAggregator {
       hearings: statistics.hearings,
       deadlines: statistics.deadlines,
       activities: statistics.activities,
+      alerts: statistics.alerts,
+      notifications: statistics.notifications,
       charts: this.statisticsService.toCharts(statistics),
       team: statistics.team,
       caseMix: statistics.cases.caseMix,

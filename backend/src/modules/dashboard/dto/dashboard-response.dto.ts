@@ -1,4 +1,11 @@
 import type { RevenueDashboardDto } from '../revenue/dto/revenue-analytics.dto';
+import type {
+  ActivitiesDashboardDto,
+  DashboardAlertsDto,
+  DeadlinesDashboardDto,
+  HearingsDashboardDto,
+  NotificationSummaryDto,
+} from '../timeline/dto/timeline.dto';
 
 /** Dynamic greeting derived from workspace timezone and the authenticated user. */
 export interface GreetingDto {
@@ -140,6 +147,13 @@ export interface RevenueBreakdownDto {
 }
 
 export type { RevenueDashboardDto } from '../revenue/dto/revenue-analytics.dto';
+export type {
+  ActivitiesDashboardDto,
+  DashboardAlertsDto,
+  DeadlinesDashboardDto,
+  HearingsDashboardDto,
+  NotificationSummaryDto,
+} from '../timeline/dto/timeline.dto';
 
 export interface HearingItemDto {
   id: string;
@@ -150,6 +164,7 @@ export interface HearingItemDto {
   caseId: string | null;
 }
 
+/** @deprecated Prefer HearingsDashboardDto from timeline engine. */
 export interface HearingsDto {
   todayCount: number;
   upcomingCount: number;
@@ -174,6 +189,7 @@ export interface DeadlineWindowsDto {
   within30Days: number;
 }
 
+/** @deprecated Prefer DeadlinesDashboardDto from timeline engine. */
 export interface DeadlinesDto {
   todayCount: number;
   upcomingCount: number;
@@ -204,13 +220,13 @@ export interface ActivityItemDto {
   target: ActivityTargetDto | null;
   workspaceId: string;
   timestamp: string;
-  /** @deprecated Prefer actor / target / timestamp — kept for Task 1 clients. */
   entityType: string | null;
   entityId: string | null;
   userId: string | null;
   createdAt: string;
 }
 
+/** @deprecated Prefer ActivitiesDashboardDto from timeline engine. */
 export interface ActivitiesDto {
   total: number;
   items: ActivityItemDto[];
@@ -281,9 +297,11 @@ export interface DashboardResponseDto {
   overview: OverviewDto;
   /** Full revenue analytics engine (Billing source of truth). */
   revenue: RevenueDashboardDto;
-  hearings: HearingsDto;
-  deadlines: DeadlinesDto;
-  activities: ActivitiesDto;
+  hearings: HearingsDashboardDto;
+  deadlines: DeadlinesDashboardDto;
+  activities: ActivitiesDashboardDto;
+  alerts: DashboardAlertsDto;
+  notifications: NotificationSummaryDto;
   charts: ChartsDto;
   team: TeamDto;
   caseMix: CaseMixDto;

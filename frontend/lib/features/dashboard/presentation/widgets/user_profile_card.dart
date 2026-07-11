@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_dimensions.dart';
-import '../../../../core/constants/app_strings.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/mizan_theme_extension.dart';
 
 /// Bottom profile strip shown in the dashboard sidebar.
 class UserProfileCard extends StatelessWidget {
   const UserProfileCard({
     super.key,
-    this.name = AppStrings.placeholderUserName,
-    this.role = AppStrings.placeholderUserRole,
-    this.initials = AppStrings.placeholderUserInitials,
+    required this.name,
+    required this.role,
+    required this.initials,
     this.onTap,
   });
 
@@ -24,13 +22,15 @@ class UserProfileCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final avatarSize = AppDimensions.sidebarLogoSize(size) * 1.05;
+    final mizan = context.mizanTheme;
+    final theme = Theme.of(context);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        splashColor: AppColors.gold.withValues(alpha: 0.1),
+        splashColor: mizan.accent.withValues(alpha: 0.1),
         child: Padding(
           padding: EdgeInsets.symmetric(
             vertical: avatarSize * 0.2,
@@ -43,11 +43,11 @@ class UserProfileCard extends StatelessWidget {
                 height: avatarSize,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: AppColors.gold,
+                  color: mizan.accent,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.gold.withValues(alpha: 0.25),
+                      color: mizan.accent.withValues(alpha: 0.25),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -55,10 +55,9 @@ class UserProfileCard extends StatelessWidget {
                 ),
                 child: Text(
                   initials,
-                  style: GoogleFonts.plusJakartaSans(
+                  style: theme.textTheme.labelLarge?.copyWith(
                     fontSize: avatarSize * 0.34,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.navyDeep,
+                    color: Colors.black,
                   ),
                 ),
               ),
@@ -72,24 +71,24 @@ class UserProfileCard extends StatelessWidget {
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: theme.textTheme.titleSmall?.copyWith(
                         fontSize: avatarSize * 0.34,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.sidebarText,
+                        color: mizan.sidebarText,
                         letterSpacing: -0.2,
                       ),
                     ),
-                    SizedBox(height: avatarSize * 0.06),
-                    Text(
-                      role,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: avatarSize * 0.28,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.sidebarMuted,
+                    if (role.isNotEmpty) ...[
+                      SizedBox(height: avatarSize * 0.06),
+                      Text(
+                        role,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: avatarSize * 0.28,
+                          color: mizan.sidebarMuted,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

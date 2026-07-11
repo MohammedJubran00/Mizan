@@ -1,12 +1,20 @@
 import 'package:dio/dio.dart';
 
+import '../storage/session_storage.dart';
+import '../storage/token_storage.dart';
 import 'api_config.dart';
 import 'api_exception.dart';
 
 /// Thin Dio wrapper — no business logic, only transport.
 class ApiClient {
-  ApiClient({Dio? dio, String? baseUrl})
-      : _dio = dio ??
+  ApiClient({
+    Dio? dio,
+    String? baseUrl,
+    TokenStorage? tokenStorage,
+    SessionStorage? sessionStorage,
+  })  : _tokenStorage = tokenStorage ?? TokenStorage(),
+        _sessionStorage = sessionStorage ?? SessionStorage(),
+        _dio = dio ??
             Dio(
               BaseOptions(
                 baseUrl: baseUrl ?? ApiConfig.baseUrl,
@@ -17,11 +25,45 @@ class ApiClient {
                   'Accept': 'application/json',
                 },
               ),
-            );
+            ) {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          final token = await _tokenStorage.readAccessToken();
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          final workspace = await _sessionStorage.readWorkspace();
+          if (workspace != null && workspace.id.isNotEmpty) {
+            options.headers['X-Workspace-Id'] = workspace.id;
+          }
+          handler.next(options);
+        },
+      ),
+    );
+  }
 
   final Dio _dio;
+  final TokenStorage _tokenStorage;
+  final SessionStorage _sessionStorage;
 
   Dio get dio => _dio;
+
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      return await _dio.get<T>(
+        path,
+        queryParameters: queryParameters,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      throw _mapDioException(e);
+    }
+  }
 
   Future<Response<T>> post<T>(
     String path, {

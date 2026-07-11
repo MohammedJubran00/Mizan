@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_dimensions.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/mizan_theme_extension.dart';
 
 /// Single navigable row in the dashboard sidebar.
 class SidebarItem extends StatefulWidget {
@@ -14,6 +13,7 @@ class SidebarItem extends StatefulWidget {
     required this.onTap,
     this.badgeLabel,
     this.badgeCount,
+    this.collapsed = false,
   });
 
   final String label;
@@ -22,6 +22,7 @@ class SidebarItem extends StatefulWidget {
   final VoidCallback onTap;
   final String? badgeLabel;
   final int? badgeCount;
+  final bool collapsed;
 
   @override
   State<SidebarItem> createState() => _SidebarItemState();
@@ -35,6 +36,7 @@ class _SidebarItemState extends State<SidebarItem> {
     final size = MediaQuery.sizeOf(context);
     final height = AppDimensions.sidebarItemHeight(size);
     final radius = AppDimensions.sidebarItemRadius(size);
+    final mizan = context.mizanTheme;
     final selected = widget.selected;
     final showHover = _hovered && !selected;
 
@@ -44,85 +46,99 @@ class _SidebarItemState extends State<SidebarItem> {
         onEnter: (_) => setState(() => _hovered = true),
         onExit: (_) => setState(() => _hovered = false),
         cursor: SystemMouseCursors.click,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          height: height,
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.sidebarSelected
-                : showHover
-                    ? AppColors.sidebarHover
-                    : Colors.transparent,
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(
+        child: Tooltip(
+          message: widget.collapsed ? widget.label : '',
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOutCubic,
+            height: height,
+            decoration: BoxDecoration(
               color: selected
-                  ? AppColors.gold.withValues(alpha: 0.55)
-                  : Colors.transparent,
-              width: 1,
-            ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: widget.onTap,
+                  ? mizan.sidebarSelected
+                  : showHover
+                      ? mizan.sidebarHover
+                      : Colors.transparent,
               borderRadius: BorderRadius.circular(radius),
-              splashColor: AppColors.gold.withValues(alpha: 0.12),
-              highlightColor: AppColors.gold.withValues(alpha: 0.06),
-              child: Stack(
-                children: [
-                  if (selected)
-                    Positioned(
-                      left: 0,
-                      top: height * 0.22,
-                      bottom: height * 0.22,
-                      child: Container(
-                        width: 3,
-                        decoration: BoxDecoration(
-                          color: AppColors.gold,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: height * 0.28),
-                    child: Row(
-                      children: [
-                        Icon(
-                          widget.icon,
-                          size: height * 0.42,
-                          color: selected
-                              ? AppColors.goldLight
-                              : AppColors.sidebarMuted,
-                        ),
-                        SizedBox(width: height * 0.28),
-                        Expanded(
-                          child: Text(
-                            widget.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.plusJakartaSans(
-                              fontSize: height * 0.32,
-                              fontWeight:
-                                  selected ? FontWeight.w600 : FontWeight.w500,
-                              color: selected
-                                  ? AppColors.sidebarText
-                                  : AppColors.sidebarMuted,
-                              letterSpacing: -0.1,
-                            ),
+              border: Border.all(
+                color: selected
+                    ? mizan.accent.withValues(alpha: 0.55)
+                    : Colors.transparent,
+                width: 1,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onTap,
+                borderRadius: BorderRadius.circular(radius),
+                splashColor: mizan.accent.withValues(alpha: 0.12),
+                highlightColor: mizan.accent.withValues(alpha: 0.06),
+                child: Stack(
+                  children: [
+                    if (selected)
+                      Positioned(
+                        left: 0,
+                        top: height * 0.22,
+                        bottom: height * 0.22,
+                        child: Container(
+                          width: 3,
+                          decoration: BoxDecoration(
+                            color: mizan.accent,
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
-                        if (widget.badgeLabel != null) ...[
-                          SizedBox(width: height * 0.12),
-                          _PillBadge(label: widget.badgeLabel!),
-                        ] else if (widget.badgeCount != null) ...[
-                          SizedBox(width: height * 0.12),
-                          _CountBadge(count: widget.badgeCount!),
+                      ),
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: widget.collapsed ? 0 : height * 0.28,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: widget.collapsed
+                            ? MainAxisAlignment.center
+                            : MainAxisAlignment.start,
+                        children: [
+                          Icon(
+                            widget.icon,
+                            size: height * 0.42,
+                            color: selected
+                                ? mizan.accent
+                                : mizan.sidebarMuted,
+                          ),
+                          if (!widget.collapsed) ...[
+                            SizedBox(width: height * 0.28),
+                            Expanded(
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      fontSize: height * 0.32,
+                                      fontWeight: selected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: selected
+                                          ? mizan.sidebarText
+                                          : mizan.sidebarMuted,
+                                      letterSpacing: -0.1,
+                                    ),
+                              ),
+                            ),
+                            if (widget.badgeLabel != null) ...[
+                              SizedBox(width: height * 0.12),
+                              _PillBadge(label: widget.badgeLabel!),
+                            ] else if (widget.badgeCount != null) ...[
+                              SizedBox(width: height * 0.12),
+                              _CountBadge(count: widget.badgeCount!),
+                            ],
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -139,20 +155,20 @@ class _PillBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mizan = context.mizanTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppColors.gold,
+        color: mizan.accent,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         label,
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-          color: AppColors.navyDeep,
-          letterSpacing: 0.4,
-        ),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontSize: 10,
+              color: Colors.black,
+              letterSpacing: 0.4,
+            ),
       ),
     );
   }
@@ -165,22 +181,22 @@ class _CountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final mizan = context.mizanTheme;
     return Container(
       constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
       padding: const EdgeInsets.symmetric(horizontal: 6),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.sidebarSurface,
+        color: mizan.sidebarSurface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.sidebarBorder),
+        border: Border.all(color: mizan.sidebarBorder),
       ),
       child: Text(
         '$count',
-        style: GoogleFonts.plusJakartaSans(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: AppColors.sidebarMuted,
-        ),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              fontSize: 11,
+              color: mizan.sidebarMuted,
+            ),
       ),
     );
   }

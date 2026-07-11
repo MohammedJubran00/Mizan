@@ -47,7 +47,6 @@ abstract final class DashboardNavData {
           label: AppStrings.cases,
           description: 'Track open matters, status, and case milestones.',
           icon: Icons.work_outline_rounded,
-          badgeCount: 9,
         ),
         NavDestination(
           id: 'hearings',
@@ -69,7 +68,6 @@ abstract final class DashboardNavData {
           label: AppStrings.documents,
           description: 'Organize filings, contracts, and shared work product.',
           icon: Icons.description_outlined,
-          badgeCount: 12,
         ),
         NavDestination(
           id: 'billing',

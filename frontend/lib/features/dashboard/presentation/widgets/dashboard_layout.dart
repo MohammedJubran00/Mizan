@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/app_dimensions.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../data/dashboard_nav_data.dart';
+import '../../../../core/session/session_cubit.dart';
+import '../../../../core/theme/mizan_theme_extension.dart';
 import '../../domain/entities/nav_destination.dart';
-import 'dashboard_app_bar.dart';
+import 'dashboard_header.dart';
 import 'sidebar.dart';
 
 /// Responsive shell: persistent sidebar on large screens, drawer on compact.
@@ -19,15 +20,15 @@ class DashboardLayout extends StatelessWidget {
   final Widget child;
   final String currentPath;
 
+  bool get _isHome => currentPath == '/dashboard';
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
         final persistent = AppDimensions.usePersistentSidebar(size);
-        final destination =
-            DashboardNavData.byPath(currentPath) ??
-            DashboardNavData.defaultDestination;
+        final mizan = context.mizanTheme;
 
         void select(NavDestination item) {
           if (!persistent && Navigator.of(context).canPop()) {
@@ -41,14 +42,41 @@ class DashboardLayout extends StatelessWidget {
         final sidebar = Sidebar(
           selectedPath: currentPath,
           onDestinationSelected: select,
+          forceExpanded: !persistent,
         );
 
+        final body = _isHome
+            ? DashboardShellScope(
+                showMenuButton: !persistent,
+                child: child,
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Builder(
+                    builder: (scaffoldContext) {
+                      return DashboardHeader(
+                        showMenuButton: !persistent,
+                        onMenuPressed: () =>
+                            Scaffold.of(scaffoldContext).openDrawer(),
+                        workspaceName: context
+                            .watch<SessionCubit>()
+                            .state
+                            .workspace
+                            ?.name,
+                      );
+                    },
+                  ),
+                  Expanded(child: child),
+                ],
+              );
+
         return Scaffold(
-          backgroundColor: AppColors.contentBackground,
+          backgroundColor: mizan.contentBackground,
           drawer: persistent
               ? null
               : Drawer(
-                  backgroundColor: AppColors.sidebarBackground,
+                  backgroundColor: mizan.sidebarBackground,
                   width: AppDimensions.sidebarWidth(size),
                   child: sidebar,
                 ),
@@ -56,28 +84,31 @@ class DashboardLayout extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (persistent) sidebar,
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Builder(
-                      builder: (scaffoldContext) {
-                        return DashboardAppBar(
-                          title: destination.label,
-                          showMenuButton: !persistent,
-                          onMenuPressed: () =>
-                              Scaffold.of(scaffoldContext).openDrawer(),
-                        );
-                      },
-                    ),
-                    Expanded(child: child),
-                  ],
-                ),
-              ),
+              Expanded(child: body),
             ],
           ),
         );
       },
     );
+  }
+}
+
+/// Passes shell chrome flags to [DashboardHomePage] without coupling Cubits to the layout.
+class DashboardShellScope extends InheritedWidget {
+  const DashboardShellScope({
+    super.key,
+    required this.showMenuButton,
+    required super.child,
+  });
+
+  final bool showMenuButton;
+
+  static DashboardShellScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<DashboardShellScope>();
+  }
+
+  @override
+  bool updateShouldNotify(DashboardShellScope oldWidget) {
+    return showMenuButton != oldWidget.showMenuButton;
   }
 }

@@ -10,14 +10,36 @@ class RegisterResponse {
   final String message;
 }
 
+class LoginWorkspaceModel {
+  const LoginWorkspaceModel({
+    required this.id,
+    required this.name,
+    required this.role,
+  });
+
+  final String id;
+  final String name;
+  final String role;
+
+  factory LoginWorkspaceModel.fromJson(Map<String, dynamic> json) {
+    return LoginWorkspaceModel(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? 'Workspace',
+      role: json['role'] as String? ?? 'MEMBER',
+    );
+  }
+}
+
 class LoginResponse {
   const LoginResponse({
     required this.accessToken,
     required this.user,
+    required this.workspace,
   });
 
   final String accessToken;
   final UserModel user;
+  final LoginWorkspaceModel workspace;
 }
 
 abstract class AuthRemoteDataSource {
@@ -80,10 +102,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
     final data = response.data ?? const <String, dynamic>{};
     final userJson = data['user'] as Map<String, dynamic>;
+    final workspaceJson =
+        data['workspace'] as Map<String, dynamic>? ?? const <String, dynamic>{};
 
     return LoginResponse(
       accessToken: data['accessToken'] as String,
       user: UserModel.fromJson(userJson),
+      workspace: LoginWorkspaceModel.fromJson(workspaceJson),
     );
   }
 }

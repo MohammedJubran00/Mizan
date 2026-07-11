@@ -8,6 +8,7 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../dashboard/presentation/dashboard_dependencies.dart';
 import '../auth_dependencies.dart';
 import '../widgets/auth_card.dart';
 import '../widgets/auth_header.dart';
@@ -57,10 +58,15 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final deps = AuthDependencyContainer.instance;
-      await deps.loginUseCase(
+      final session = await deps.loginUseCase(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         cancelToken: _cancelToken,
+      );
+
+      await AppDependencies.instance.sessionCubit.setSession(
+        user: session.user,
+        workspace: session.workspace,
       );
 
       if (!mounted) return;

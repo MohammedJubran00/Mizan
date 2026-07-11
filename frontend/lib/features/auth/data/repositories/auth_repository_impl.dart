@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../../../../core/storage/session_storage.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -47,6 +48,11 @@ class AuthRepositoryImpl implements AuthRepository {
     return AuthSession(
       accessToken: response.accessToken,
       user: response.user.toEntity(),
+      workspace: WorkspaceSession(
+        id: response.workspace.id,
+        name: response.workspace.name,
+        role: response.workspace.role,
+      ),
     );
   }
 }

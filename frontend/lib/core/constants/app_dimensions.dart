@@ -99,6 +99,8 @@ abstract final class AppDimensions {
   /// Fixed sidebar appears from this width upward (tablet landscape / desktop / web).
   static const double sidebarBreakpoint = 900;
 
+  static const double sidebarCollapsedWidth = 84;
+
   static bool usePersistentSidebar(Size size) => size.width >= sidebarBreakpoint;
 
   static double sidebarWidth(Size size) => _clamp(size.width * 0.22, 248, 288);

@@ -1,13 +1,16 @@
+import '../../../../core/storage/session_storage.dart';
 import '../entities/user_entity.dart';
 
 class AuthSession {
   const AuthSession({
     required this.accessToken,
     required this.user,
+    required this.workspace,
   });
 
   final String accessToken;
   final UserEntity user;
+  final WorkspaceSession workspace;
 }
 
 class RegisterResult {

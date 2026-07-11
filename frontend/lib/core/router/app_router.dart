@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/sign_up_page.dart';
 import '../../features/dashboard/data/dashboard_nav_data.dart';
+import '../../features/dashboard/presentation/pages/dashboard_home_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_section_page.dart';
 import '../../features/dashboard/presentation/widgets/dashboard_layout.dart';
 import '../../features/onboarding/presentation/pages/onboarding_page.dart';
@@ -29,8 +31,9 @@ abstract final class AppRoutes {
   static const settings = '/settings';
 }
 
-GoRouter createAppRouter() {
+GoRouter createAppRouter({GlobalKey<NavigatorState>? navigatorKey}) {
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: AppRoutes.onboarding,
     routes: [
       GoRoute(
@@ -65,7 +68,9 @@ GoRouter createAppRouter() {
               path: destination.path,
               pageBuilder: (context, state) => NoTransitionPage(
                 key: state.pageKey,
-                child: DashboardSectionPage(destination: destination),
+                child: destination.path == AppRoutes.dashboard
+                    ? const DashboardHomePage()
+                    : DashboardSectionPage(destination: destination),
               ),
             ),
         ],

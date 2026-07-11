@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_dimensions.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/mizan_theme_extension.dart';
 import 'empty_state.dart';
 
 /// Standard content frame for dashboard pages — title, description, body.
@@ -26,9 +25,11 @@ class PageContainer extends StatelessWidget {
     final padding = AppDimensions.contentPadding(size);
     final titleSize = (size.width * 0.04).clamp(26.0, 34.0);
     final radius = AppDimensions.cardRadius(size);
+    final theme = Theme.of(context);
+    final mizan = context.mizanTheme;
 
     return ColoredBox(
-      color: AppColors.contentBackground,
+      color: mizan.contentBackground,
       child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
@@ -42,10 +43,8 @@ class PageContainer extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.playfairDisplay(
+                    style: theme.textTheme.headlineMedium?.copyWith(
                       fontSize: titleSize,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.navyDeep,
                       letterSpacing: -0.4,
                       height: 1.15,
                     ),
@@ -57,10 +56,8 @@ class PageContainer extends StatelessWidget {
                     ),
                     child: Text(
                       description,
-                      style: GoogleFonts.plusJakartaSans(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontSize: (titleSize * 0.42).clamp(14.0, 16.0),
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textSecondary,
                         height: 1.55,
                       ),
                     ),
@@ -68,18 +65,19 @@ class PageContainer extends StatelessWidget {
                   SizedBox(height: padding.top * 1.1),
                   ConstrainedBox(
                     constraints: BoxConstraints(
-                      minHeight: (constraints.maxHeight * 0.55).clamp(280.0, 520.0),
+                      minHeight:
+                          (constraints.maxHeight * 0.55).clamp(280.0, 520.0),
                     ),
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: AppColors.white,
+                        color: mizan.cardBackground,
                         borderRadius: BorderRadius.circular(radius),
-                        border: Border.all(color: AppColors.cardBorder),
-                        boxShadow: const [
+                        border: Border.all(color: mizan.cardBorder),
+                        boxShadow: [
                           BoxShadow(
-                            color: AppColors.shadow,
+                            color: mizan.shadow,
                             blurRadius: 18,
-                            offset: Offset(0, 6),
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),

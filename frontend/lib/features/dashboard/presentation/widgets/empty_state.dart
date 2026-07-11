@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_strings.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/mizan_theme_extension.dart';
 
 /// Centered empty / placeholder content for dashboard sections.
 class EmptyState extends StatelessWidget {
@@ -21,6 +20,8 @@ class EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final iconBox = (size.shortestSide * 0.14).clamp(64.0, 88.0);
+    final theme = Theme.of(context);
+    final mizan = context.mizanTheme;
 
     return Center(
       child: ConstrainedBox(
@@ -34,23 +35,21 @@ class EmptyState extends StatelessWidget {
               width: iconBox,
               height: iconBox,
               decoration: BoxDecoration(
-                color: AppColors.blueSoft,
+                color: mizan.accentSoft,
                 borderRadius: BorderRadius.circular(iconBox * 0.28),
               ),
               child: Icon(
                 icon,
                 size: iconBox * 0.42,
-                color: AppColors.navy,
+                color: mizan.accent,
               ),
             ),
             SizedBox(height: iconBox * 0.35),
             Text(
               title,
               textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontSize: (iconBox * 0.28).clamp(16.0, 20.0),
-                fontWeight: FontWeight.w700,
-                color: AppColors.navyDeep,
                 letterSpacing: -0.2,
               ),
             ),
@@ -58,10 +57,8 @@ class EmptyState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: GoogleFonts.plusJakartaSans(
+              style: theme.textTheme.bodyMedium?.copyWith(
                 fontSize: (iconBox * 0.22).clamp(13.5, 15.5),
-                fontWeight: FontWeight.w400,
-                color: AppColors.textSecondary,
                 height: 1.5,
               ),
             ),

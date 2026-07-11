@@ -1,30 +1,13 @@
 import type { ActivitiesDto } from '../dto';
-import type { DashboardActivityRepository } from '../repositories/dashboard-activity.repository';
+import type { ActivityEngineService } from './activity-engine.service';
 
 /**
- * Recent activity feed statistics for one workspace.
+ * Dashboard-facing activity statistics — delegates to the reusable Activity Engine.
  */
 export class ActivityStatisticsService {
-  constructor(private readonly activityRepository: DashboardActivityRepository) {}
+  constructor(private readonly activityEngine: ActivityEngineService) {}
 
   async calculate(workspaceId: string): Promise<ActivitiesDto> {
-    const [total, items] = await Promise.all([
-      this.activityRepository.countActivities(workspaceId),
-      this.activityRepository.findRecentActivities(workspaceId, 15),
-    ]);
-
-    return {
-      total,
-      items: items.map((item) => ({
-        id: item.id,
-        type: item.type,
-        title: item.title,
-        description: item.description,
-        entityType: item.entityType,
-        entityId: item.entityId,
-        userId: item.userId,
-        createdAt: item.createdAt.toISOString(),
-      })),
-    };
+    return this.activityEngine.calculateRecent(workspaceId);
   }
 }

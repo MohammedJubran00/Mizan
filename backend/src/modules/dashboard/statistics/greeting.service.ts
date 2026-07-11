@@ -1,13 +1,19 @@
 import type { GreetingDto } from '../dto';
+import { getZonedHour, normalizeTimezone } from '../../../shared/utils/timezone';
 
 /**
- * Builds a time-of-day greeting from the authenticated user's name and server clock.
- * Never hardcodes the greeting text beyond the period template.
+ * Builds a time-of-day greeting from the authenticated user's name
+ * and the workspace timezone clock — never hardcoded names or periods.
  */
 export class GreetingService {
-  build(fullName: string, now: Date = new Date()): GreetingDto {
+  build(
+    fullName: string,
+    now: Date = new Date(),
+    timezone = 'UTC',
+  ): GreetingDto {
+    const tz = normalizeTimezone(timezone);
     const firstName = extractFirstName(fullName);
-    const period = resolvePeriod(now);
+    const period = resolvePeriod(getZonedHour(now, tz));
     const salutation = periodSalutation(period);
 
     return {
@@ -15,6 +21,7 @@ export class GreetingService {
       period,
       firstName,
       serverTime: now.toISOString(),
+      timezone: tz,
     };
   }
 }
@@ -27,8 +34,7 @@ function extractFirstName(fullName: string): string {
   return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
-function resolvePeriod(now: Date): GreetingDto['period'] {
-  const hour = now.getHours();
+function resolvePeriod(hour: number): GreetingDto['period'] {
   if (hour < 12) {
     return 'morning';
   }

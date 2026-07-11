@@ -8,7 +8,6 @@ import type { GreetingService } from '../statistics/greeting.service';
 
 /**
  * Application service for the dashboard aggregation API.
- * Controllers must not contain business logic — it lives here.
  */
 export class DashboardService {
   constructor(
@@ -29,8 +28,12 @@ export class DashboardService {
     }
 
     const now = new Date();
-    const greeting = this.greetingService.build(auth.user.fullName, now);
-    const parts = await this.aggregator.aggregate(auth.workspaceId, greeting, now);
+    const greeting = this.greetingService.build(
+      auth.user.fullName,
+      now,
+      auth.workspaceTimezone,
+    );
+    const parts = await this.aggregator.aggregate(auth, greeting, now);
     const composed = this.aggregator.compose(auth, parts);
     const response = this.mapper.toResponse(composed);
 

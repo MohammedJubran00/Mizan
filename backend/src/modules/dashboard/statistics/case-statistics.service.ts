@@ -1,32 +1,32 @@
+import { round2, safeDivide, toPercentageDistribution } from '../../../shared/utils/math';
+import type { WorkspacePeriods } from '../../../shared/utils/timezone';
 import type {
   ActiveCasesCardDto,
   BillableHoursCardDto,
   CaseMixDto,
-  ChartSeriesPointDto,
-  ClientsCardDto,
+  CaseOverviewStatsDto,
   WinRateCardDto,
 } from '../dto';
 import type { DashboardCaseRepository } from '../repositories/dashboard-case.repository';
-import type { DashboardClientRepository } from '../repositories/dashboard-client.repository';
 
 export interface CaseStatisticsResult {
+  overview: CaseOverviewStatsDto;
   activeCases: ActiveCasesCardDto;
   winRate: WinRateCardDto;
   billableHours: BillableHoursCardDto;
-  clients: ClientsCardDto;
   caseMix: CaseMixDto;
 }
 
 /**
- * Case / client / win-rate / billable-hours statistics for one workspace.
+ * Case, win-rate, case-mix, and billable-hours statistics for one workspace.
  */
 export class CaseStatisticsService {
-  constructor(
-    private readonly caseRepository: DashboardCaseRepository,
-    private readonly clientRepository: DashboardClientRepository,
-  ) {}
+  constructor(private readonly caseRepository: DashboardCaseRepository) {}
 
-  async calculate(workspaceId: string): Promise<CaseStatisticsResult> {
+  async calculate(
+    workspaceId: string,
+    periods: WorkspacePeriods,
+  ): Promise<CaseStatisticsResult> {
     const [
       active,
       open,
@@ -34,9 +34,15 @@ export class CaseStatisticsService {
       total,
       won,
       lost,
-      billableHoursTotal,
+      pending,
+      draft,
+      billableHoursOnCases,
       billableCaseCount,
-      clientsTotal,
+      entryLifetime,
+      entryToday,
+      entryWeek,
+      entryMonth,
+      entryYear,
       byStatus,
       byPracticeArea,
     ] = await Promise.all([
@@ -46,59 +52,82 @@ export class CaseStatisticsService {
       this.caseRepository.countTotalCases(workspaceId),
       this.caseRepository.countWonCases(workspaceId),
       this.caseRepository.countLostCases(workspaceId),
+      this.caseRepository.countPendingCases(workspaceId),
+      this.caseRepository.countDraftCases(workspaceId),
       this.caseRepository.sumBillableHours(workspaceId),
       this.caseRepository.countCasesWithBillableHours(workspaceId),
-      this.clientRepository.countClients(workspaceId),
+      this.caseRepository.sumAllBillableHourEntries(workspaceId),
+      this.caseRepository.sumBillableHoursInPeriod(workspaceId, periods.today),
+      this.caseRepository.sumBillableHoursInPeriod(workspaceId, periods.thisWeek),
+      this.caseRepository.sumBillableHoursInPeriod(workspaceId, periods.thisMonth),
+      this.caseRepository.sumBillableHoursInPeriod(workspaceId, periods.thisYear),
       this.caseRepository.groupByStatus(workspaceId),
       this.caseRepository.groupByPracticeArea(workspaceId),
     ]);
 
-    const decided = won + lost;
-    const winRate = decided === 0 ? 0 : Math.round((won / decided) * 10000) / 100;
+    const winRate =
+      closed === 0 ? 0 : round2(safeDivide(won, closed) * 100);
+
+    const totalHours = entryLifetime > 0 ? entryLifetime : billableHoursOnCases;
     const averagePerCase =
-      billableCaseCount === 0
-        ? 0
-        : Math.round((billableHoursTotal / billableCaseCount) * 100) / 100;
+      billableCaseCount === 0 ? 0 : round2(safeDivide(totalHours, billableCaseCount));
 
-    const statusSeries: ChartSeriesPointDto[] = byStatus.map((row) => ({
-      label: row.status,
-      value: row.count,
-    }));
+    const statusMix = toPercentageDistribution(
+      byStatus.map((row) => ({ label: row.status, value: row.count })),
+    );
 
-    const practiceSeries: ChartSeriesPointDto[] = byPracticeArea.map((row) => ({
-      label: row.practiceArea,
-      value: row.count,
-    }));
+    const practiceMix = toPercentageDistribution(
+      byPracticeArea.map((row) => ({ label: row.practiceArea, value: row.count })),
+    );
+
+    const overview: CaseOverviewStatsDto = {
+      total,
+      active,
+      closed,
+      won,
+      lost,
+      pending,
+      draft,
+      open,
+    };
 
     return {
+      overview,
       activeCases: {
         active,
         open,
         closed,
         total,
+        pending,
+        draft,
+        won,
+        lost,
         trendLabel: total === 0 ? 'No cases yet' : `${active} active`,
       },
       winRate: {
         winRate,
         won,
         lost,
-        decided,
-        trendLabel: decided === 0 ? 'No decided cases' : `${winRate}% win rate`,
+        closed,
+        decided: won + lost,
+        trendLabel: closed === 0 ? 'No closed cases' : `${winRate}% win rate`,
       },
       billableHours: {
-        totalHours: billableHoursTotal,
+        totalHours,
         caseCount: billableCaseCount,
         averagePerCase,
-        trendLabel:
-          billableHoursTotal === 0 ? 'No billable hours' : `${billableHoursTotal} hours`,
-      },
-      clients: {
-        total: clientsTotal,
-        trendLabel: clientsTotal === 0 ? 'No clients yet' : `${clientsTotal} clients`,
+        periods: {
+          today: entryToday,
+          week: entryWeek,
+          month: entryMonth,
+          year: entryYear,
+          lifetime: totalHours,
+        },
+        trendLabel: totalHours === 0 ? 'No billable hours' : `${totalHours} hours`,
       },
       caseMix: {
-        byStatus: statusSeries,
-        byPracticeArea: practiceSeries,
+        byStatus: statusMix,
+        byPracticeArea: practiceMix,
       },
     };
   }

@@ -5,6 +5,7 @@ import type { WorkspaceRole } from '@prisma/client';
 import { env } from '../../config/env';
 import { prisma } from '../../config/prisma';
 import { AppError } from '../errors/AppError';
+import { normalizeTimezone } from '../utils/timezone';
 
 interface JwtPayload {
   sub: string;
@@ -74,6 +75,7 @@ export async function authenticate(
       },
       workspaceId: membership.workspaceId,
       workspaceRole: membership.role,
+      workspaceTimezone: membership.timezone,
     };
 
     next();
@@ -85,23 +87,47 @@ export async function authenticate(
 async function resolveMembership(
   userId: string,
   workspaceId?: string,
-): Promise<{ workspaceId: string; role: WorkspaceRole } | null> {
+): Promise<{ workspaceId: string; role: WorkspaceRole; timezone: string } | null> {
   if (workspaceId) {
     const membership = await prisma.workspaceMember.findUnique({
       where: {
         workspaceId_userId: { workspaceId, userId },
       },
-      select: { workspaceId: true, role: true },
+      select: {
+        workspaceId: true,
+        role: true,
+        workspace: { select: { timezone: true } },
+      },
     });
 
-    return membership;
+    if (!membership) {
+      return null;
+    }
+
+    return {
+      workspaceId: membership.workspaceId,
+      role: membership.role,
+      timezone: normalizeTimezone(membership.workspace.timezone),
+    };
   }
 
   const fallback = await prisma.workspaceMember.findFirst({
     where: { userId },
     orderBy: { createdAt: 'asc' },
-    select: { workspaceId: true, role: true },
+    select: {
+      workspaceId: true,
+      role: true,
+      workspace: { select: { timezone: true } },
+    },
   });
 
-  return fallback;
+  if (!fallback) {
+    return null;
+  }
+
+  return {
+    workspaceId: fallback.workspaceId,
+    role: fallback.role,
+    timezone: normalizeTimezone(fallback.workspace.timezone),
+  };
 }

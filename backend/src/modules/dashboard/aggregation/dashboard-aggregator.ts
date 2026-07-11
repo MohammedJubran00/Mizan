@@ -1,6 +1,5 @@
 import type { AuthContext } from '../../../shared/types/auth-context';
-import type { DashboardResponseDto } from '../dto';
-import type { GreetingDto } from '../dto';
+import type { DashboardResponseDto, GreetingDto } from '../dto';
 import type { DashboardStatisticsBundle } from '../statistics/dashboard-statistics.service';
 import type { DashboardStatisticsService } from '../statistics/dashboard-statistics.service';
 
@@ -8,26 +7,31 @@ export interface AggregatedDashboardParts {
   greeting: GreetingDto;
   statistics: DashboardStatisticsBundle;
   generatedAt: Date;
+  timezone: string;
 }
 
 /**
  * Aggregation layer between raw statistics and the response mapper.
- * Ready for future analytics / monthly reports without reshaping services.
  */
 export class DashboardAggregator {
   constructor(private readonly statisticsService: DashboardStatisticsService) {}
 
   async aggregate(
-    workspaceId: string,
+    auth: AuthContext,
     greeting: GreetingDto,
     now: Date = new Date(),
   ): Promise<AggregatedDashboardParts> {
-    const statistics = await this.statisticsService.calculateAll(workspaceId, now);
+    const statistics = await this.statisticsService.calculateAll({
+      workspaceId: auth.workspaceId,
+      timezone: auth.workspaceTimezone,
+      now,
+    });
 
     return {
       greeting,
       statistics,
       generatedAt: now,
+      timezone: auth.workspaceTimezone,
     };
   }
 
@@ -35,7 +39,7 @@ export class DashboardAggregator {
     auth: AuthContext,
     parts: AggregatedDashboardParts,
   ): Omit<DashboardResponseDto, 'success'> {
-    const { statistics, greeting, generatedAt } = parts;
+    const { statistics, greeting, generatedAt, timezone } = parts;
     const firstName = greeting.firstName;
 
     return {
@@ -50,6 +54,7 @@ export class DashboardAggregator {
       workspace: {
         id: auth.workspaceId,
         role: auth.workspaceRole,
+        timezone,
       },
       overview: this.statisticsService.toOverview(statistics),
       revenue: statistics.revenue.breakdown,

@@ -1,5 +1,7 @@
 import type { DeadlineStatus, PrismaClient } from '@prisma/client';
 
+import type { PeriodBounds } from '../../../shared/utils/timezone';
+
 export interface DeadlineProjection {
   id: string;
   title: string;
@@ -8,30 +10,52 @@ export interface DeadlineProjection {
   caseId: string | null;
 }
 
+const OPEN_STATUSES: DeadlineStatus[] = ['PENDING', 'OVERDUE'];
+
 export class DashboardDeadlineRepository {
   constructor(private readonly db: PrismaClient) {}
 
-  async countUpcomingDeadlines(workspaceId: string, from: Date): Promise<number> {
+  async countInPeriod(
+    workspaceId: string,
+    period: PeriodBounds,
+    statuses: DeadlineStatus[] = OPEN_STATUSES,
+  ): Promise<number> {
     return this.db.deadline.count({
       where: {
         workspaceId,
-        status: { in: ['PENDING', 'OVERDUE'] },
+        status: { in: statuses },
+        dueAt: { gte: period.start, lt: period.end },
+      },
+    });
+  }
+
+  async countUpcoming(workspaceId: string, from: Date): Promise<number> {
+    return this.db.deadline.count({
+      where: {
+        workspaceId,
+        status: { in: OPEN_STATUSES },
         dueAt: { gte: from },
       },
     });
   }
 
-  async countOverdueDeadlines(workspaceId: string, before: Date): Promise<number> {
+  async countOverdue(workspaceId: string, before: Date): Promise<number> {
     return this.db.deadline.count({
       where: {
         workspaceId,
-        status: { in: ['PENDING', 'OVERDUE'] },
+        status: { in: OPEN_STATUSES },
         dueAt: { lt: before },
       },
     });
   }
 
-  async findUpcomingDeadlines(
+  async countCompleted(workspaceId: string): Promise<number> {
+    return this.db.deadline.count({
+      where: { workspaceId, status: 'COMPLETED' },
+    });
+  }
+
+  async findNearestUpcoming(
     workspaceId: string,
     from: Date,
     take: number,
@@ -39,7 +63,7 @@ export class DashboardDeadlineRepository {
     return this.db.deadline.findMany({
       where: {
         workspaceId,
-        status: { in: ['PENDING', 'OVERDUE'] },
+        status: { in: OPEN_STATUSES },
         dueAt: { gte: from },
       },
       select: {

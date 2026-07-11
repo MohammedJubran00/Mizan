@@ -10,4 +10,6 @@ export interface AuthContext {
   user: AuthenticatedUser;
   workspaceId: string;
   workspaceRole: WorkspaceRole;
+  /** IANA timezone for the authenticated workspace. */
+  workspaceTimezone: string;
 }

@@ -4,16 +4,22 @@ import { DashboardController } from './controllers/dashboard.controller';
 import { DashboardAggregator } from './aggregation/dashboard-aggregator';
 import { DashboardMapper } from './mapper/dashboard.mapper';
 import { DashboardActivityRepository } from './repositories/dashboard-activity.repository';
+import {
+  DashboardBillingRepository,
+  DashboardInvoiceRepository,
+} from './repositories/dashboard-billing.repository';
 import { DashboardCaseRepository } from './repositories/dashboard-case.repository';
 import { DashboardClientRepository } from './repositories/dashboard-client.repository';
 import { DashboardDeadlineRepository } from './repositories/dashboard-deadline.repository';
 import { DashboardHearingRepository } from './repositories/dashboard-hearing.repository';
-import { DashboardInvoiceRepository } from './repositories/dashboard-invoice.repository';
 import { DashboardTeamRepository } from './repositories/dashboard-team.repository';
 import { createDashboardRouter } from './routes/dashboard.routes';
+import { BillingService } from './services/billing.service';
 import { DashboardService } from './services/dashboard.service';
+import { ActivityEngineService } from './statistics/activity-engine.service';
 import { ActivityStatisticsService } from './statistics/activity-statistics.service';
 import { CaseStatisticsService } from './statistics/case-statistics.service';
+import { ClientStatisticsService } from './statistics/client-statistics.service';
 import { DashboardStatisticsService } from './statistics/dashboard-statistics.service';
 import { DeadlineStatisticsService } from './statistics/deadline-statistics.service';
 import { GreetingService } from './statistics/greeting.service';
@@ -26,19 +32,28 @@ export function buildDashboardModule() {
   const clientRepository = new DashboardClientRepository(prisma);
   const hearingRepository = new DashboardHearingRepository(prisma);
   const deadlineRepository = new DashboardDeadlineRepository(prisma);
+  const billingRepository = new DashboardBillingRepository(prisma);
   const invoiceRepository = new DashboardInvoiceRepository(prisma);
   const activityRepository = new DashboardActivityRepository(prisma);
   const teamRepository = new DashboardTeamRepository(prisma);
 
-  const caseStatistics = new CaseStatisticsService(caseRepository, clientRepository);
-  const revenueStatistics = new RevenueStatisticsService(invoiceRepository);
+  const activityEngine = new ActivityEngineService(activityRepository);
+  const billingService = new BillingService(prisma, activityEngine);
+
+  const caseStatistics = new CaseStatisticsService(caseRepository);
+  const clientStatistics = new ClientStatisticsService(clientRepository);
+  const revenueStatistics = new RevenueStatisticsService(
+    billingRepository,
+    invoiceRepository,
+  );
   const hearingStatistics = new HearingStatisticsService(hearingRepository);
   const deadlineStatistics = new DeadlineStatisticsService(deadlineRepository);
-  const activityStatistics = new ActivityStatisticsService(activityRepository);
-  const teamStatistics = new TeamStatisticsService(teamRepository);
+  const activityStatistics = new ActivityStatisticsService(activityEngine);
+  const teamStatistics = new TeamStatisticsService(teamRepository, caseRepository);
 
   const dashboardStatistics = new DashboardStatisticsService(
     caseStatistics,
+    clientStatistics,
     revenueStatistics,
     hearingStatistics,
     deadlineStatistics,
@@ -61,5 +76,9 @@ export function buildDashboardModule() {
   const dashboardController = new DashboardController(dashboardService);
   const dashboardRouter = createDashboardRouter(dashboardController);
 
-  return { dashboardRouter };
+  return {
+    dashboardRouter,
+    billingService,
+    activityEngine,
+  };
 }

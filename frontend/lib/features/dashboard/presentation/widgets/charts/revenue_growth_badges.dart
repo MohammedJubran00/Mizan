@@ -73,6 +73,7 @@ class RevenueGrowthPanel extends StatelessWidget {
     ];
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < items.length; i++) ...[
           if (i > 0) const SizedBox(height: DesignTokens.space12),

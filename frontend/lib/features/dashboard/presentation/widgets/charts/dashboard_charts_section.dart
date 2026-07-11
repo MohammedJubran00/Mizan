@@ -40,6 +40,8 @@ class DashboardChartsSection extends StatelessWidget {
             final wide = constraints.maxWidth >= DesignTokens.breakpointDesktop;
             final medium = constraints.maxWidth >= DesignTokens.breakpointTablet;
 
+            final plotHeight = DesignTokens.chartHeightRegular;
+
             final revenueTrend = DashboardChartCard(
               title: 'Revenue Trend',
               subtitle: 'Monthly revenue from Billing',
@@ -51,6 +53,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Paid invoices and manual revenue will appear here.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 40),
               trailing: charts == null
                   ? null
@@ -79,6 +82,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Create your first case to see status distribution.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 80),
               child: DashboardPieChart(
                 points: charts?.casesByStatus ?? const [],
@@ -97,6 +101,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Practice area mix appears once cases are filed.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 120),
               child: DashboardBarChart(
                 points: charts?.caseMixByPracticeArea ?? const [],
@@ -115,6 +120,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Invoice and manual revenue categories show here.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 160),
               child: DashboardPieChart(
                 points: charts?.revenue.pieChart.points ?? const [],
@@ -134,6 +140,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Scheduled hearings will populate this chart.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 200),
               child: DashboardBarChart(
                 points: charts?.hearingDistribution ?? const [],
@@ -152,6 +159,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Financial balances appear after billing activity.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 240),
               child: DashboardBarChart(
                 points: charts?.billingStatistics ?? const [],
@@ -170,6 +178,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Invite team members to see role distribution.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 280),
               trailing: charts == null
                   ? null
@@ -180,6 +189,7 @@ class DashboardChartsSection extends StatelessWidget {
               ),
             );
 
+            // Content-driven — no fixed height; grows with comparison rows.
             final growthCompare = DashboardChartCard(
               title: 'Revenue Growth',
               subtitle: 'Period comparisons from the analytics engine',
@@ -189,7 +199,6 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Growth comparisons appear once revenue is recorded.',
               errorMessage: error,
               onRetry: retry,
-              height: DesignTokens.chartHeightCompact,
               delay: const Duration(milliseconds: 100),
               child: RevenueGrowthPanel(analytics: charts?.revenue),
             );
@@ -205,6 +214,7 @@ class DashboardChartsSection extends StatelessWidget {
               emptyMessage: 'Activity volume builds as your team works.',
               errorMessage: error,
               onRetry: retry,
+              height: plotHeight,
               delay: const Duration(milliseconds: 320),
               child: DashboardBarChart(
                 points: charts?.monthlyActivity ?? const [],

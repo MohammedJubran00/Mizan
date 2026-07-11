@@ -7,6 +7,10 @@ import '../section_error.dart';
 import '../skeleton.dart';
 
 /// Shared chrome for every dashboard chart — loading / empty / error / content.
+///
+/// Pass [height] for plot charts that need a fixed drawing viewport.
+/// Omit [height] for content-driven panels (e.g. growth comparisons) so the
+/// card grows with its children and never overflows a fixed box.
 class DashboardChartCard extends StatelessWidget {
   const DashboardChartCard({
     super.key,
@@ -33,6 +37,8 @@ class DashboardChartCard extends StatelessWidget {
   final Widget child;
   final String? errorMessage;
   final VoidCallback? onRetry;
+
+  /// Fixed viewport for fl_chart plots. Null = size to content.
   final double? height;
   final Widget? trailing;
   final Duration delay;
@@ -40,7 +46,10 @@ class DashboardChartCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final chartHeight = height ?? DesignTokens.chartHeightRegular;
+    final body = AnimatedSwitcher(
+      duration: DesignTokens.durationNormal,
+      child: _body(context),
+    );
 
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
@@ -57,6 +66,7 @@ class DashboardChartCard extends StatelessWidget {
       },
       child: DashboardSurface(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
@@ -64,6 +74,7 @@ class DashboardChartCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -85,28 +96,29 @@ class DashboardChartCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: DesignTokens.space16),
-            SizedBox(
-              height: chartHeight,
-              child: AnimatedSwitcher(
-                duration: DesignTokens.durationNormal,
-                child: _body(context, chartHeight),
-              ),
-            ),
+            if (height != null)
+              SizedBox(height: height, child: body)
+            else
+              body,
           ],
         ),
       ),
     );
   }
 
-  Widget _body(BuildContext context, double chartHeight) {
+  Widget _body(BuildContext context) {
     if (isLoading) {
-      return ChartSkeleton(key: const ValueKey('loading'), height: chartHeight);
+      return ChartSkeleton(
+        key: const ValueKey('loading'),
+        height: height ?? DesignTokens.chartHeightCompact,
+      );
     }
     if (errorMessage != null) {
       return SectionError(
         key: const ValueKey('error'),
         message: errorMessage!,
         onRetry: onRetry,
+        compact: true,
       );
     }
     if (isEmpty) {
@@ -125,6 +137,7 @@ class DashboardChartCard extends StatelessWidget {
   }
 }
 
+/// Skeleton that works in both fixed-height and intrinsic layouts.
 class ChartSkeleton extends StatelessWidget {
   const ChartSkeleton({super.key, this.height = 220});
 
@@ -132,10 +145,13 @@ class ChartSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final plotHeight = height * 0.78;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
+        SizedBox(
+          height: plotHeight,
           child: Align(
             alignment: Alignment.bottomCenter,
             child: Row(
@@ -145,7 +161,7 @@ class ChartSkeleton extends StatelessWidget {
                   if (i > 0) const SizedBox(width: 8),
                   Expanded(
                     child: SkeletonBox(
-                      height: height * (0.35 + (i % 4) * 0.12),
+                      height: plotHeight * (0.35 + (i % 4) * 0.12),
                       borderRadius: 8,
                     ),
                   ),
@@ -155,8 +171,8 @@ class ChartSkeleton extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          children: const [
+        const Row(
+          children: [
             SkeletonBox(width: 64, height: 10),
             Spacer(),
             SkeletonBox(width: 48, height: 10),

@@ -59,7 +59,8 @@ export class TeamStatisticsService {
       members: members.map((member) => ({
         userId: member.userId,
         fullName: member.fullName,
-        email: member.email,
+        /** Email redacted on dashboard aggregation — not required for widgets. */
+        email: '',
         role: member.role,
         isActive: member.isActive,
       })),

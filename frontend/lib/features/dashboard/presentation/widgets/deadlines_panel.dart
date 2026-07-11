@@ -4,6 +4,7 @@ import '../../../../core/theme/mizan_theme_extension.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import 'dashboard_empty_state.dart';
 import 'dashboard_surface.dart';
+import 'priority_tone.dart';
 import 'section_error.dart';
 import 'skeleton.dart';
 
@@ -76,7 +77,7 @@ class _DeadlineTile extends StatelessWidget {
         ? mizan.success
         : critical
             ? mizan.danger
-            : _priorityColor(mizan, deadline.priority);
+            : priorityTone(mizan, deadline.priority);
 
     return Semantics(
       label: '${deadline.title}. ${deadline.daysRemaining} days remaining.',
@@ -158,19 +159,6 @@ class _DeadlineTile extends StatelessWidget {
     if (days == 0) return 'Due today';
     if (days == 1) return '1 day left';
     return '$days days left';
-  }
-
-  Color _priorityColor(MizanThemeExtension mizan, String priority) {
-    switch (priority.toUpperCase()) {
-      case 'CRITICAL':
-        return mizan.danger;
-      case 'HIGH':
-        return mizan.warning;
-      case 'LOW':
-        return mizan.info;
-      default:
-        return mizan.accent;
-    }
   }
 }
 

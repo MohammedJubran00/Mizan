@@ -247,6 +247,7 @@ export interface ChartsDto {
 export interface TeamMemberDto {
   userId: string;
   fullName: string;
+  /** May be empty — dashboard aggregation redacts emails by default. */
   email: string;
   role: string;
   isActive: boolean;

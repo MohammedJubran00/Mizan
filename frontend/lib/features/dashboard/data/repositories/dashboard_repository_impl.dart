@@ -2,12 +2,14 @@ import 'package:dio/dio.dart';
 
 import '../../../../core/cache/smart_cache.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/storage/session_storage.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import '../../domain/repositories/dashboard_repository.dart';
 import '../datasources/dashboard_remote_datasource.dart';
 
-const _dashboardTtl = Duration(seconds: 40);
+const _dashboardTtl = DesignTokens.dashboardCacheTtl;
 const _dashboardTags = {
   CacheDomain.dashboard,
   CacheDomain.overview,
@@ -43,9 +45,15 @@ class DashboardRepositoryImpl implements DashboardRepository {
     bool forceRefresh = false,
   }) async {
     final workspace = await _sessionStorage.readWorkspace();
-    final workspaceId = workspace?.id ?? 'anonymous';
+    final workspaceId = workspace?.id;
+    if (workspaceId == null || workspaceId.isEmpty) {
+      throw const ApiException(
+        message: 'Workspace context is required.',
+        statusCode: 403,
+      );
+    }
     final page = activityPage ?? 1;
-    final size = activityPageSize ?? 20;
+    final size = activityPageSize ?? DesignTokens.activityPageSize;
     final cursor = activityCursor ?? '';
     final cacheKey =
         'v1:dashboard:$workspaceId:p$page:s$size:c$cursor';

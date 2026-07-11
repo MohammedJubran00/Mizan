@@ -56,6 +56,19 @@ abstract final class DesignTokens {
   // ── Card ─────────────────────────────────────────────────────────────────
   static const EdgeInsets cardPadding = EdgeInsets.all(space20);
   static const double cardMinHeight = 120;
+
+  // ── Responsive breakpoints ───────────────────────────────────────────────
+  static const double breakpointCompact = 520;
+  static const double breakpointMobile = 600;
+  static const double breakpointTablet = 720;
+  static const double breakpointDesktop = 1100;
+  static const double breakpointWide = 1400;
+
+  // ── Dashboard data ───────────────────────────────────────────────────────
+  /// Keep aligned with backend `DASHBOARD_CACHE_TTL_SECONDS`.
+  static const Duration dashboardCacheTtl = Duration(seconds: 45);
+  static const int activityPageSize = 20;
+  static const Duration searchDebounce = Duration(milliseconds: 350);
 }
 
 /// Semantic status token keys used with [MizanThemeExtension].

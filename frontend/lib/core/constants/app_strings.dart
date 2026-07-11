@@ -71,10 +71,18 @@ abstract final class AppStrings {
   // Dashboard — chrome
   static const String searchPlaceholder = 'Search cases, clients…';
   static const String notifications = 'Notifications';
-  static const String placeholderUserName = 'Layla Haddad';
-  static const String placeholderUserRole = 'Administrator';
-  static const String placeholderUserInitials = 'LH';
   static const String comingSoon = 'Coming soon';
   static const String emptyStateHint =
       'This section is ready for your practice data.';
+  static const String retry = 'Retry';
+  static const String loadMore = 'Load more';
+  static const String offlineBanner =
+      'You appear to be offline. Showing the last available data.';
+  static const String recentActivity = 'Recent Activity';
+  static const String upcomingHearings = 'Upcoming Hearings';
+  static const String deadlines = 'Deadlines';
+  static const String noRecentActivity = 'No Recent Activity';
+  static const String noHearings = 'No Hearings Scheduled';
+  static const String noDeadlines = 'No Deadlines';
+  static const String quickActionsSoon = 'Quick actions coming soon.';
 }

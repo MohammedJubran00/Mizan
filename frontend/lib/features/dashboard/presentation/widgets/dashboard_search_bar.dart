@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/constants/app_dimensions.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/mizan_theme_extension.dart';
 import '../../../../core/utils/debouncer.dart';
 
@@ -13,7 +14,7 @@ class DashboardSearchBar extends StatefulWidget {
     this.controller,
     this.onChanged,
     this.hintText = AppStrings.searchPlaceholder,
-    this.debounce = const Duration(milliseconds: 350),
+    this.debounce = DesignTokens.searchDebounce,
   });
 
   final TextEditingController? controller;

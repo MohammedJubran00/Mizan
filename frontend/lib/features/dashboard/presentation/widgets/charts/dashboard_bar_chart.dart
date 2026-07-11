@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/theme/design_tokens.dart';
 import '../../../../../core/theme/mizan_theme_extension.dart';
 import '../../../domain/entities/dashboard_charts_entity.dart';
+import '../../utils/chart_number_format.dart';
 
 /// Vertical bar chart from backend points.
 class DashboardBarChart extends StatelessWidget {
@@ -36,7 +37,7 @@ class DashboardBarChart extends StatelessWidget {
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               final point = points[group.x.toInt()];
               return BarTooltipItem(
-                '${point.label}\n${_format(point.value)}',
+                '${point.label}\n${ChartNumberFormat.display(point.value)}',
                 TextStyle(
                   color: mizan.chartTooltipForeground,
                   fontWeight: FontWeight.w600,
@@ -68,7 +69,7 @@ class DashboardBarChart extends StatelessWidget {
                   return const SizedBox.shrink();
                 }
                 return Text(
-                  _compact(value),
+                  ChartNumberFormat.compact(value),
                   style: theme.textTheme.labelSmall?.copyWith(fontSize: 10),
                 );
               },
@@ -122,17 +123,5 @@ class DashboardBarChart extends StatelessWidget {
       duration: DesignTokens.durationChart,
       curve: DesignTokens.curveStandard,
     );
-  }
-
-  static String _format(double v) {
-    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(1);
-  }
-
-  static String _compact(double v) {
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(0)}K';
-    return v.toInt().toString();
   }
 }

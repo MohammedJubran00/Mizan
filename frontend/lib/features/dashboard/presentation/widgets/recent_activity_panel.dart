@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/mizan_theme_extension.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import 'dashboard_empty_state.dart';
@@ -36,7 +37,7 @@ class RecentActivityPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Recent Activity', style: theme.textTheme.titleMedium),
+          Text(AppStrings.recentActivity, style: theme.textTheme.titleMedium),
           const SizedBox(height: 16),
           if (isLoading)
             const ListSkeleton(rows: 5)
@@ -49,7 +50,7 @@ class RecentActivityPanel extends StatelessWidget {
           else if (!hasItems)
             const DashboardEmptyState(
               icon: Icons.timeline_outlined,
-              title: 'No Recent Activity',
+              title: AppStrings.noRecentActivity,
               message: 'Team actions across your workspace will appear here.',
             )
           else ...[
@@ -81,7 +82,7 @@ class RecentActivityPanel extends StatelessWidget {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Load more'),
+                      : const Text(AppStrings.loadMore),
                 ),
               ),
             ],
@@ -114,7 +115,10 @@ class _ActivityTile extends StatelessWidget {
     final theme = Theme.of(context);
     final mizan = context.mizanTheme;
 
-    return IntrinsicHeight(
+    return Semantics(
+      label:
+          '${item.actorName ?? item.title}. ${item.description ?? item.action}. ${item.relativeTime}',
+      child: IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -221,6 +225,7 @@ class _ActivityTile extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 

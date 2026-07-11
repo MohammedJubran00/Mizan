@@ -4,6 +4,7 @@ import '../../../../core/theme/mizan_theme_extension.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import 'dashboard_empty_state.dart';
 import 'dashboard_surface.dart';
+import 'priority_tone.dart';
 import 'section_error.dart';
 import 'skeleton.dart';
 
@@ -87,7 +88,7 @@ class _HearingTile extends StatelessWidget {
     final theme = Theme.of(context);
     final mizan = context.mizanTheme;
     final remaining = _remainingLabel(hearing.daysRemaining);
-    final priorityColor = _priorityColor(mizan, hearing.priority);
+    final priorityColor = priorityTone(mizan, hearing.priority);
 
     return Semantics(
       label:
@@ -168,19 +169,6 @@ class _HearingTile extends StatelessWidget {
     if (days == 0) return 'Today';
     if (days == 1) return 'Tomorrow';
     return 'In $days days';
-  }
-
-  Color _priorityColor(MizanThemeExtension mizan, String priority) {
-    switch (priority.toUpperCase()) {
-      case 'CRITICAL':
-        return mizan.danger;
-      case 'HIGH':
-        return mizan.warning;
-      case 'LOW':
-        return mizan.info;
-      default:
-        return mizan.accent;
-    }
   }
 }
 

@@ -37,8 +37,8 @@ class DashboardChartsSection extends StatelessWidget {
 
         return LayoutBuilder(
           builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 1100;
-            final medium = constraints.maxWidth >= 720;
+            final wide = constraints.maxWidth >= DesignTokens.breakpointDesktop;
+            final medium = constraints.maxWidth >= DesignTokens.breakpointTablet;
 
             final revenueTrend = DashboardChartCard(
               title: 'Revenue Trend',

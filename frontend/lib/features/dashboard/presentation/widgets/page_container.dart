@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/app_dimensions.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/mizan_theme_extension.dart';
-import 'empty_state.dart';
+import 'dashboard_empty_state.dart';
 
 /// Standard content frame for dashboard pages — title, description, body.
 class PageContainer extends StatelessWidget {
@@ -84,8 +85,10 @@ class PageContainer extends StatelessWidget {
                       child: Padding(
                         padding: EdgeInsets.all(padding.top * 1.2),
                         child: child ??
-                            EmptyState(
+                            DashboardEmptyState(
                               icon: icon ?? Icons.folder_open_outlined,
+                              title: AppStrings.comingSoon,
+                              message: AppStrings.emptyStateHint,
                             ),
                       ),
                     ),

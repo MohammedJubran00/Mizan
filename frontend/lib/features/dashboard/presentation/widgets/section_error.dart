@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/mizan_theme_extension.dart';
 
 /// Compact error panel with retry — keeps the dashboard resilient.
@@ -52,7 +53,7 @@ class SectionError extends StatelessWidget {
               TextButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Retry'),
+                label: const Text(AppStrings.retry),
               ),
             ],
           ],

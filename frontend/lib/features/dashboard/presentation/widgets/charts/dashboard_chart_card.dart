@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../../core/theme/design_tokens.dart';
-import '../../../../../core/theme/mizan_theme_extension.dart';
+import '../dashboard_empty_state.dart';
 import '../dashboard_surface.dart';
 import '../section_error.dart';
 import '../skeleton.dart';
@@ -110,67 +110,17 @@ class DashboardChartCard extends StatelessWidget {
       );
     }
     if (isEmpty) {
-      return ChartEmptyState(
+      return DashboardEmptyState(
         key: const ValueKey('empty'),
+        icon: Icons.bar_chart_rounded,
         title: emptyTitle,
         message: emptyMessage,
+        compact: true,
       );
     }
-    return KeyedSubtree(key: const ValueKey('content'), child: child);
-  }
-}
-
-class ChartEmptyState extends StatelessWidget {
-  const ChartEmptyState({
-    super.key,
-    required this.title,
-    required this.message,
-  });
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final mizan = context.mizanTheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(DesignTokens.space12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: mizan.accentSoft,
-                borderRadius: BorderRadius.circular(DesignTokens.radiusMd),
-              ),
-              child: Icon(
-                Icons.bar_chart_rounded,
-                color: mizan.accent,
-                size: DesignTokens.iconLg,
-              ),
-            ),
-            const SizedBox(height: DesignTokens.space12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.onSurface,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: DesignTokens.space4),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
+    return Semantics(
+      label: '$title. $subtitle',
+      child: KeyedSubtree(key: const ValueKey('content'), child: child),
     );
   }
 }

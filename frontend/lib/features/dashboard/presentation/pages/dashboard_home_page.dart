@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/session/session_cubit.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/utils/infinite_scroll_controller.dart';
@@ -16,6 +17,7 @@ import '../widgets/charts/dashboard_charts_section.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/dashboard_layout.dart';
 import '../widgets/deadlines_panel.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/recent_activity_panel.dart';
 import '../widgets/section_error.dart';
 import '../widgets/skeleton.dart';
@@ -88,6 +90,7 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
                 prev.status != next.status ||
                 prev.errorMessage != next.errorMessage ||
                 prev.refreshing != next.refreshing ||
+                prev.offline != next.offline ||
                 prev.data?.greeting != next.data?.greeting ||
                 prev.data?.formattedDate != next.data?.formattedDate ||
                 prev.data?.notifications != next.data?.notifications,
@@ -112,13 +115,14 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
                         onQuickAction: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Quick actions coming soon.'),
+                              content: Text(AppStrings.quickActionsSoon),
                             ),
                           );
                         },
                       );
                     },
                   ),
+                  if (state.offline) const OfflineBanner(),
                   Expanded(
                     child: _DashboardBody(
                       scrollController: _scrollController,
@@ -172,23 +176,23 @@ class _DashboardBody extends StatelessWidget {
             builder: (context, constraints) {
               final width = constraints.maxWidth;
               final padding = EdgeInsets.symmetric(
-                horizontal: width < 600
+                horizontal: width < DesignTokens.breakpointMobile
                     ? DesignTokens.space16
-                    : width < 1100
+                    : width < DesignTokens.breakpointDesktop
                         ? DesignTokens.space24
                         : DesignTokens.space32,
                 vertical: DesignTokens.space20,
               );
-              final crossAxisCount = width >= 1400
+              final crossAxisCount = width >= DesignTokens.breakpointWide
                   ? 5
-                  : width >= 1100
+                  : width >= DesignTokens.breakpointDesktop
                       ? 4
-                      : width >= 720
+                      : width >= DesignTokens.breakpointTablet
                           ? 3
-                          : width >= 520
+                          : width >= DesignTokens.breakpointCompact
                               ? 2
                               : 1;
-              final useTwoColumn = width >= 1100;
+              final useTwoColumn = width >= DesignTokens.breakpointDesktop;
 
               return CustomScrollView(
                 controller: scrollController,

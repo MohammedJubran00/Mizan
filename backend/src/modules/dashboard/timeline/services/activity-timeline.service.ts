@@ -122,10 +122,6 @@ function mapTimelineActivity(
 ): TimelineActivityDto {
   const style = ACTIVITY_STYLE[row.type] ?? ACTIVITY_STYLE.OTHER!;
   const timestamp = row.createdAt.toISOString();
-  const metadata =
-    row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
-      ? (row.metadata as Record<string, unknown>)
-      : null;
 
   return {
     id: row.id,
@@ -134,7 +130,8 @@ function mapTimelineActivity(
       ? {
           id: row.actor.id,
           fullName: row.actor.fullName,
-          email: row.actor.email,
+          /** Email redacted — dashboard UI only needs display name / avatar. */
+          email: '',
           avatarUrl: row.actor.avatarUrl,
         }
       : null,
@@ -151,7 +148,8 @@ function mapTimelineActivity(
     timestamp,
     relativeTime: formatRelativeTime(row.createdAt, now),
     severity: row.severity || style.severity,
-    metadata,
+    /** Freeform metadata withheld from dashboard clients by default. */
+    metadata: null,
     entityType: row.entityType,
     entityId: row.entityId,
     userId: row.userId,

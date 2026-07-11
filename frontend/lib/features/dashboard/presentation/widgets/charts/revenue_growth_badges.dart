@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/theme/design_tokens.dart';
 import '../../../../../core/theme/mizan_theme_extension.dart';
 import '../../../domain/entities/dashboard_charts_entity.dart';
+import '../../utils/chart_number_format.dart';
 
 class GrowthBadge extends StatelessWidget {
   const GrowthBadge({super.key, required this.metric});
@@ -117,7 +118,7 @@ class _GrowthRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_fmt(metric.previousValue)} → ${_fmt(metric.currentValue)}',
+                  '${ChartNumberFormat.display(metric.previousValue)} → ${ChartNumberFormat.display(metric.currentValue)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],
@@ -127,12 +128,5 @@ class _GrowthRow extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  static String _fmt(double v) {
-    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
-    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
-    if (v == v.roundToDouble()) return v.toInt().toString();
-    return v.toStringAsFixed(2);
   }
 }

@@ -1,109 +1,50 @@
-import { calculateGrowthPercent } from '../../../shared/utils/math';
+import type { RevenueCardDto } from '../dto';
+import type { RevenueDashboardDto } from '../revenue/dto/revenue-analytics.dto';
+import type { RevenueFilterInput } from '../revenue/filters/revenue-filter';
+import type { RevenueAnalyticsService } from '../revenue/services/revenue-analytics.service';
 import type { WorkspacePeriods } from '../../../shared/utils/timezone';
-import type { RevenueBreakdownDto, RevenueCardDto } from '../dto';
-import type { DashboardBillingRepository } from '../repositories/dashboard-billing.repository';
-import type { DashboardInvoiceRepository } from '../repositories/dashboard-billing.repository';
 
 export interface RevenueStatisticsResult {
   card: RevenueCardDto;
-  breakdown: RevenueBreakdownDto;
+  /** Full revenue analytics engine payload (also used as dashboard `revenue`). */
+  analytics: RevenueDashboardDto;
 }
 
 /**
- * Revenue statistics from Billing (paid invoices + manual revenue).
- * Periods and growth respect workspace timezone bounds.
+ * Dashboard revenue facade — delegates to the Revenue Analytics Engine.
+ * Preserves overview card mapping for existing dashboard consumers.
  */
 export class RevenueStatisticsService {
-  constructor(
-    private readonly billingRepository: DashboardBillingRepository,
-    private readonly invoiceRepository: DashboardInvoiceRepository,
-  ) {}
+  constructor(private readonly revenueAnalytics: RevenueAnalyticsService) {}
 
   async calculate(
     workspaceId: string,
     periods: WorkspacePeriods,
+    filter: RevenueFilterInput = { topLimit: 5 },
+    timezone = 'UTC',
   ): Promise<RevenueStatisticsResult> {
-    const [
-      lifetime,
-      fromInvoices,
-      fromManual,
-      today,
-      yesterday,
-      thisWeek,
-      lastWeek,
-      thisMonth,
-      lastMonth,
-      thisQuarter,
-      thisYear,
-      lastYear,
-      outstanding,
-      draft,
-      invoiceCount,
-      paidInvoiceCount,
-      byMonth,
-    ] = await Promise.all([
-      this.billingRepository.sumLifetime(workspaceId),
-      this.billingRepository.sumBySource(workspaceId, 'INVOICE'),
-      this.billingRepository.sumBySource(workspaceId, 'MANUAL'),
-      this.billingRepository.sumInPeriod(workspaceId, periods.today),
-      this.billingRepository.sumInPeriod(workspaceId, periods.yesterday),
-      this.billingRepository.sumInPeriod(workspaceId, periods.thisWeek),
-      this.billingRepository.sumInPeriod(workspaceId, periods.lastWeek),
-      this.billingRepository.sumInPeriod(workspaceId, periods.thisMonth),
-      this.billingRepository.sumInPeriod(workspaceId, periods.lastMonth),
-      this.billingRepository.sumInPeriod(workspaceId, periods.thisQuarter),
-      this.billingRepository.sumInPeriod(workspaceId, periods.thisYear),
-      this.billingRepository.sumInPeriod(workspaceId, periods.lastYear),
-      this.invoiceRepository.calculateOutstandingRevenue(workspaceId),
-      this.invoiceRepository.calculateDraftRevenue(workspaceId),
-      this.invoiceRepository.countInvoices(workspaceId),
-      this.invoiceRepository.countPaidInvoices(workspaceId),
-      this.billingRepository.calculateRevenueByMonth(workspaceId, 6),
-    ]);
-
-    const currency = 'USD';
-    const growth = {
-      weekOverWeek: calculateGrowthPercent(thisWeek, lastWeek),
-      monthOverMonth: calculateGrowthPercent(thisMonth, lastMonth),
-      yearOverYear: calculateGrowthPercent(thisYear, lastYear),
-    };
+    const analytics = await this.revenueAnalytics.calculate({
+      workspaceId,
+      timezone,
+      periods,
+      filter,
+    });
 
     return {
       card: {
-        totalPaid: lifetime,
-        currency,
-        invoiceCount,
-        paidInvoiceCount,
-        outstanding,
-        fromInvoices,
-        fromManual,
+        totalPaid: analytics.paid,
+        currency: analytics.currency,
+        invoiceCount: analytics.summary.invoiceCount,
+        paidInvoiceCount: analytics.summary.paidInvoiceCount,
+        outstanding: analytics.outstanding,
+        fromInvoices: analytics.fromInvoices,
+        fromManual: analytics.fromManual,
         trendLabel:
-          lifetime === 0 && outstanding === 0
+          analytics.paid === 0 && analytics.outstanding === 0
             ? 'No revenue yet'
-            : `${currency} ${lifetime}`,
+            : `${analytics.currency} ${analytics.paid}`,
       },
-      breakdown: {
-        paid: lifetime,
-        outstanding,
-        draft,
-        currency,
-        fromInvoices,
-        fromManual,
-        periods: {
-          today,
-          yesterday,
-          thisWeek,
-          lastWeek,
-          thisMonth,
-          lastMonth,
-          thisQuarter,
-          thisYear,
-          lastYear,
-          lifetime,
-        },
-        growth,
-        byMonth,
-      },
+      analytics,
     };
   }
 }

@@ -45,6 +45,7 @@ enum InvoiceStatus {
   PAID
   OVERDUE
   CANCELLED
+  REFUNDED
 }
 
 enum ClientStatus {
@@ -55,6 +56,25 @@ enum ClientStatus {
 enum BillingSource {
   INVOICE
   MANUAL
+  /// Reserved for Stripe / future payment providers.
+  PROVIDER
+}
+
+enum RevenueCategory {
+  INVOICE_PAYMENT
+  MANUAL
+  CONSULTATION
+  COURT_FEE
+  RETAINER
+  SUBSCRIPTION
+  OTHER
+}
+
+enum BillingStatus {
+  POSTED
+  PENDING
+  CANCELLED
+  REFUNDED
 }
 
 enum ActivityType {
@@ -91,19 +111,22 @@ model User {
   assignedCases       Case[]              @relation("CaseAssignee")
   billableHourEntries BillableHourEntry[]
   manualRevenues      ManualRevenue[]
+  billingsAsLawyer    Billing[]           @relation("BillingLawyer")
 
   @@map("users")
 }
 
 /// Independent SaaS tenant. All operational data is scoped by workspaceId.
 model Workspace {
-  id        String   @id @default(uuid())
-  name      String
-  slug      String   @unique
+  id              String   @id @default(uuid())
+  name            String
+  slug            String   @unique
   /// IANA timezone used for all dashboard period calculations (e.g. Asia/Riyadh).
-  timezone  String   @default("UTC")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  timezone        String   @default("UTC")
+  /// Default reporting currency (multi-currency ready).
+  defaultCurrency String   @default("USD")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   members             WorkspaceMember[]
   clients             Client[]
@@ -150,9 +173,11 @@ model Client {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  cases     Case[]
-  invoices  Invoice[]
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases          Case[]
+  invoices       Invoice[]
+  billings       Billing[]
+  manualRevenues ManualRevenue[]
 
   @@index([workspaceId])
   @@index([workspaceId, status])
@@ -181,6 +206,8 @@ model Case {
   deadlines           Deadline[]
   invoices            Invoice[]
   billableHourEntries BillableHourEntry[]
+  billings            Billing[]
+  manualRevenues      ManualRevenue[]
 
   @@index([workspaceId])
   @@index([workspaceId, status])
@@ -259,48 +286,70 @@ model Invoice {
   @@map("invoices")
 }
 
-/// Single financial source of truth. Paid invoices and manual revenue both land here.
+/// Single financial source of truth. Paid invoices, manual revenue, and providers land here.
 model Billing {
-  id              String        @id @default(uuid())
+  id              String          @id @default(uuid())
   workspaceId     String
-  amount          Decimal       @db.Decimal(14, 2)
-  currency        String        @default("USD")
+  amount          Decimal         @db.Decimal(14, 2)
+  currency        String          @default("USD")
   source          BillingSource
-  invoiceId       String?       @unique
-  manualRevenueId String?       @unique
+  category        RevenueCategory @default(OTHER)
+  status          BillingStatus   @default(POSTED)
+  invoiceId       String?         @unique
+  manualRevenueId String?         @unique
+  clientId        String?
+  caseId          String?
+  lawyerUserId    String?
   occurredAt      DateTime
   description     String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   invoice       Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   manualRevenue ManualRevenue? @relation(fields: [manualRevenueId], references: [id], onDelete: Cascade)
+  client        Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case          Case?          @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  lawyer        User?          @relation("BillingLawyer", fields: [lawyerUserId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId])
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, source])
+  @@index([workspaceId, category])
+  @@index([workspaceId, status])
+  @@index([workspaceId, currency])
+  @@index([workspaceId, clientId])
+  @@index([workspaceId, caseId])
+  @@index([workspaceId, lawyerUserId])
+  @@index([workspaceId, status, occurredAt])
+  @@index([createdAt])
   @@map("billings")
 }
 
 /// Manual revenue entry — always mirrored into Billing on create.
 model ManualRevenue {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   workspaceId String
-  amount      Decimal  @db.Decimal(14, 2)
-  currency    String   @default("USD")
+  amount      Decimal         @db.Decimal(14, 2)
+  currency    String          @default("USD")
+  category    RevenueCategory @default(MANUAL)
   description String?
-  occurredAt  DateTime @default(now())
+  clientId    String?
+  caseId      String?
+  occurredAt  DateTime        @default(now())
   createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
   billing   Billing?
 
   @@index([workspaceId])
   @@index([workspaceId, occurredAt])
+  @@index([workspaceId, category])
   @@map("manual_revenues")
 }
 

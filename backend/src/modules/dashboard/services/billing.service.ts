@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient, RevenueCategory } from '@prisma/client';
 
 import type { ActivityEngineService } from '../statistics/activity-engine.service';
 
@@ -8,9 +8,13 @@ export interface RecordManualRevenueInput {
   workspaceId: string;
   amount: number;
   currency?: string;
+  category?: RevenueCategory;
   description?: string;
   occurredAt?: Date;
   createdById?: string;
+  clientId?: string;
+  caseId?: string;
+  lawyerUserId?: string;
 }
 
 export interface RecordPaidInvoiceBillingInput {
@@ -20,6 +24,10 @@ export interface RecordPaidInvoiceBillingInput {
   currency?: string;
   paidAt: Date;
   description?: string;
+  clientId?: string | null;
+  caseId?: string | null;
+  lawyerUserId?: string | null;
+  category?: RevenueCategory;
 }
 
 /**
@@ -41,8 +49,18 @@ export class BillingService {
   }> {
     const occurredAt = input.occurredAt ?? new Date();
     const currency = input.currency ?? 'USD';
+    const category = input.category ?? 'MANUAL';
     const manualRevenueId = randomUUID();
     const billingId = randomUUID();
+
+    let lawyerUserId = input.lawyerUserId ?? null;
+    if (!lawyerUserId && input.caseId) {
+      const legalCase = await this.db.case.findUnique({
+        where: { id: input.caseId },
+        select: { assignedToUserId: true, clientId: true },
+      });
+      lawyerUserId = legalCase?.assignedToUserId ?? null;
+    }
 
     await this.db.$transaction(async (tx) => {
       await tx.manualRevenue.create({
@@ -51,9 +69,12 @@ export class BillingService {
           workspaceId: input.workspaceId,
           amount: input.amount,
           currency,
+          category,
           description: input.description,
           occurredAt,
           createdById: input.createdById,
+          clientId: input.clientId,
+          caseId: input.caseId,
         },
       });
 
@@ -64,7 +85,12 @@ export class BillingService {
           amount: input.amount,
           currency,
           source: 'MANUAL',
+          category,
+          status: 'POSTED',
           manualRevenueId,
+          clientId: input.clientId,
+          caseId: input.caseId,
+          lawyerUserId,
           occurredAt,
           description: input.description ?? 'Manual revenue',
         },
@@ -100,6 +126,24 @@ export class BillingService {
     const billingId = randomUUID();
     const currency = input.currency ?? 'USD';
 
+    let clientId = input.clientId ?? null;
+    let caseId = input.caseId ?? null;
+    let lawyerUserId = input.lawyerUserId ?? null;
+
+    if (clientId == null || caseId == null || lawyerUserId == null) {
+      const invoice = await this.db.invoice.findUnique({
+        where: { id: input.invoiceId },
+        select: {
+          clientId: true,
+          caseId: true,
+          case: { select: { assignedToUserId: true } },
+        },
+      });
+      clientId = clientId ?? invoice?.clientId ?? null;
+      caseId = caseId ?? invoice?.caseId ?? null;
+      lawyerUserId = lawyerUserId ?? invoice?.case?.assignedToUserId ?? null;
+    }
+
     await this.db.billing.create({
       data: {
         id: billingId,
@@ -107,7 +151,12 @@ export class BillingService {
         amount: input.amount,
         currency,
         source: 'INVOICE',
+        category: input.category ?? 'INVOICE_PAYMENT',
+        status: 'POSTED',
         invoiceId: input.invoiceId,
+        clientId,
+        caseId,
+        lawyerUserId,
         occurredAt: input.paidAt,
         description: input.description ?? 'Paid invoice',
       },

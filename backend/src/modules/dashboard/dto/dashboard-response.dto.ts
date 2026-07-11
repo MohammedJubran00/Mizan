@@ -1,3 +1,5 @@
+import type { RevenueDashboardDto } from '../revenue/dto/revenue-analytics.dto';
+
 /** Dynamic greeting derived from workspace timezone and the authenticated user. */
 export interface GreetingDto {
   message: string;
@@ -52,6 +54,7 @@ export interface RevenuePeriodsDto {
   thisMonth: number;
   lastMonth: number;
   thisQuarter: number;
+  lastQuarter: number;
   thisYear: number;
   lastYear: number;
   lifetime: number;
@@ -60,6 +63,7 @@ export interface RevenuePeriodsDto {
 export interface RevenueGrowthDto {
   weekOverWeek: number;
   monthOverMonth: number;
+  quarterOverQuarter: number;
   yearOverYear: number;
 }
 
@@ -134,6 +138,8 @@ export interface RevenueBreakdownDto {
   growth: RevenueGrowthDto;
   byMonth: RevenueMonthPointDto[];
 }
+
+export type { RevenueDashboardDto } from '../revenue/dto/revenue-analytics.dto';
 
 export interface HearingItemDto {
   id: string;
@@ -273,7 +279,8 @@ export interface DashboardResponseDto {
   user: DashboardUserDto;
   workspace: DashboardWorkspaceDto;
   overview: OverviewDto;
-  revenue: RevenueBreakdownDto;
+  /** Full revenue analytics engine (Billing source of truth). */
+  revenue: RevenueDashboardDto;
   hearings: HearingsDto;
   deadlines: DeadlinesDto;
   activities: ActivitiesDto;

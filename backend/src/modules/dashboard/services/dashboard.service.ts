@@ -1,9 +1,15 @@
+import { createHash } from 'crypto';
+
 import { AppError } from '../../../shared/errors/AppError';
 import type { AuthContext } from '../../../shared/types/auth-context';
-import type { DashboardCache } from '../cache/dashboard-cache';
+import {
+  buildDashboardCacheKey,
+  type DashboardCache,
+} from '../cache/dashboard-cache';
 import type { DashboardResponseDto } from '../dto';
 import type { DashboardAggregator } from '../aggregation/dashboard-aggregator';
 import type { DashboardMapper } from '../mapper/dashboard.mapper';
+import type { RevenueFilterInput } from '../revenue/filters/revenue-filter';
 import type { GreetingService } from '../statistics/greeting.service';
 
 /**
@@ -17,12 +23,18 @@ export class DashboardService {
     private readonly cache: DashboardCache,
   ) {}
 
-  async getDashboard(auth: AuthContext): Promise<DashboardResponseDto> {
+  async getDashboard(
+    auth: AuthContext,
+    revenueFilter: RevenueFilterInput = { topLimit: 5 },
+  ): Promise<DashboardResponseDto> {
     if (!auth.workspaceId) {
       throw new AppError(403, 'Workspace context is required.');
     }
 
-    const cached = await this.cache.get(auth.workspaceId);
+    const filterDigest = digestFilters(revenueFilter);
+    const cacheKey = buildDashboardCacheKey(auth.workspaceId, filterDigest);
+
+    const cached = await this.cache.get(cacheKey);
     if (cached) {
       return cached;
     }
@@ -33,12 +45,46 @@ export class DashboardService {
       now,
       auth.workspaceTimezone,
     );
-    const parts = await this.aggregator.aggregate(auth, greeting, now);
+    const parts = await this.aggregator.aggregate(
+      auth,
+      greeting,
+      now,
+      revenueFilter,
+    );
     const composed = this.aggregator.compose(auth, parts);
     const response = this.mapper.toResponse(composed);
 
-    await this.cache.set(auth.workspaceId, response);
+    await this.cache.set(cacheKey, response);
 
     return response;
   }
+}
+
+function digestFilters(filter: RevenueFilterInput): string | undefined {
+  const meaningful = {
+    dateFrom: filter.dateFrom?.toISOString() ?? null,
+    dateTo: filter.dateTo?.toISOString() ?? null,
+    practiceArea: filter.practiceArea ?? null,
+    lawyerId: filter.lawyerId ?? null,
+    caseType: filter.caseType ?? null,
+    clientId: filter.clientId ?? null,
+    currency: filter.currency ?? null,
+    source: filter.source ?? null,
+    category: filter.category ?? null,
+    status: filter.status ?? null,
+    topLimit: filter.topLimit ?? 5,
+  };
+
+  const hasFilter = Object.entries(meaningful).some(([key, value]) => {
+    if (key === 'topLimit') {
+      return value !== 5;
+    }
+    return value != null;
+  });
+
+  if (!hasFilter) {
+    return undefined;
+  }
+
+  return createHash('sha1').update(JSON.stringify(meaningful)).digest('hex').slice(0, 12);
 }

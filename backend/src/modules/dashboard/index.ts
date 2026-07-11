@@ -13,6 +13,8 @@ import { DashboardClientRepository } from './repositories/dashboard-client.repos
 import { DashboardDeadlineRepository } from './repositories/dashboard-deadline.repository';
 import { DashboardHearingRepository } from './repositories/dashboard-hearing.repository';
 import { DashboardTeamRepository } from './repositories/dashboard-team.repository';
+import { RevenueAnalyticsRepository } from './revenue/repositories/revenue-analytics.repository';
+import { RevenueAnalyticsService } from './revenue/services/revenue-analytics.service';
 import { createDashboardRouter } from './routes/dashboard.routes';
 import { BillingService } from './services/billing.service';
 import { DashboardService } from './services/dashboard.service';
@@ -36,16 +38,17 @@ export function buildDashboardModule() {
   const invoiceRepository = new DashboardInvoiceRepository(prisma);
   const activityRepository = new DashboardActivityRepository(prisma);
   const teamRepository = new DashboardTeamRepository(prisma);
+  const revenueAnalyticsRepository = new RevenueAnalyticsRepository(prisma);
 
   const activityEngine = new ActivityEngineService(activityRepository);
   const billingService = new BillingService(prisma, activityEngine);
+  const revenueAnalyticsService = new RevenueAnalyticsService(
+    revenueAnalyticsRepository,
+  );
 
   const caseStatistics = new CaseStatisticsService(caseRepository);
   const clientStatistics = new ClientStatisticsService(clientRepository);
-  const revenueStatistics = new RevenueStatisticsService(
-    billingRepository,
-    invoiceRepository,
-  );
+  const revenueStatistics = new RevenueStatisticsService(revenueAnalyticsService);
   const hearingStatistics = new HearingStatisticsService(hearingRepository);
   const deadlineStatistics = new DeadlineStatisticsService(deadlineRepository);
   const activityStatistics = new ActivityStatisticsService(activityEngine);
@@ -80,5 +83,9 @@ export function buildDashboardModule() {
     dashboardRouter,
     billingService,
     activityEngine,
+    revenueAnalyticsService,
+    // Keep legacy repos available for internal tooling / future modules.
+    billingRepository,
+    invoiceRepository,
   };
 }

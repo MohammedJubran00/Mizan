@@ -11,6 +11,7 @@ import type {
   OverviewDto,
   TeamDto,
 } from '../dto';
+import type { RevenueFilterInput } from '../revenue/filters/revenue-filter';
 import type { CaseStatisticsResult } from './case-statistics.service';
 import type { CaseStatisticsService } from './case-statistics.service';
 import type { ClientStatisticsService } from './client-statistics.service';
@@ -35,6 +36,7 @@ export interface DashboardStatisticsContext {
   workspaceId: string;
   timezone: string;
   now?: Date;
+  revenueFilter?: RevenueFilterInput;
 }
 
 /**
@@ -58,12 +60,18 @@ export class DashboardStatisticsService {
     const now = context.now ?? new Date();
     const timezone = normalizeTimezone(context.timezone);
     const periods = resolveWorkspacePeriods(now, timezone);
+    const revenueFilter = context.revenueFilter ?? { topLimit: 5 };
 
     const [cases, clients, revenue, hearings, deadlines, activities, team] =
       await Promise.all([
         this.caseStatistics.calculate(context.workspaceId, periods),
         this.clientStatistics.calculate(context.workspaceId, periods),
-        this.revenueStatistics.calculate(context.workspaceId, periods),
+        this.revenueStatistics.calculate(
+          context.workspaceId,
+          periods,
+          revenueFilter,
+          timezone,
+        ),
         this.hearingStatistics.calculate(context.workspaceId, now, periods),
         this.deadlineStatistics.calculate(context.workspaceId, now, periods),
         this.activityStatistics.calculate(context.workspaceId),
@@ -87,7 +95,7 @@ export class DashboardStatisticsService {
   toCharts(bundle: DashboardStatisticsBundle): ChartsDto {
     return {
       casesByStatus: bundle.cases.caseMix.byStatus,
-      revenueByMonth: bundle.revenue.breakdown.byMonth,
+      revenueByMonth: bundle.revenue.analytics.byMonth,
       caseMixByPracticeArea: bundle.cases.caseMix.byPracticeArea,
     };
   }

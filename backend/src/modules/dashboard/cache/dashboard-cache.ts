@@ -3,10 +3,11 @@ import type { DashboardResponseDto } from '../dto';
 /**
  * Cache contract for dashboard payloads.
  * Smart Cache / background refresh can plug in later without changing services.
+ * Key includes optional filter digest so filtered analytics stay isolatable.
  */
 export interface DashboardCache {
-  get(workspaceId: string): Promise<DashboardResponseDto | null>;
-  set(workspaceId: string, value: DashboardResponseDto, ttlSeconds?: number): Promise<void>;
+  get(cacheKey: string): Promise<DashboardResponseDto | null>;
+  set(cacheKey: string, value: DashboardResponseDto, ttlSeconds?: number): Promise<void>;
   invalidate(workspaceId: string): Promise<void>;
 }
 
@@ -14,12 +15,12 @@ export interface DashboardCache {
  * No-op cache used until a real store (Redis, memory, etc.) is wired.
  */
 export class PassthroughDashboardCache implements DashboardCache {
-  async get(_workspaceId: string): Promise<DashboardResponseDto | null> {
+  async get(_cacheKey: string): Promise<DashboardResponseDto | null> {
     return null;
   }
 
   async set(
-    _workspaceId: string,
+    _cacheKey: string,
     _value: DashboardResponseDto,
     _ttlSeconds?: number,
   ): Promise<void> {
@@ -29,4 +30,11 @@ export class PassthroughDashboardCache implements DashboardCache {
   async invalidate(_workspaceId: string): Promise<void> {
     // Intentionally empty.
   }
+}
+
+export function buildDashboardCacheKey(
+  workspaceId: string,
+  filterDigest?: string,
+): string {
+  return filterDigest ? `dashboard:${workspaceId}:${filterDigest}` : `dashboard:${workspaceId}`;
 }

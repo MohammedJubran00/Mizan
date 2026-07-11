@@ -24,6 +24,7 @@ export type {
   OverviewDto,
   RevenueBreakdownDto,
   RevenueCardDto,
+  RevenueDashboardDto,
   RevenueGrowthDto,
   RevenueMonthPointDto,
   RevenuePeriodsDto,
@@ -32,3 +33,4 @@ export type {
   TeamRoleCountsDto,
   WinRateCardDto,
 } from './dashboard-response.dto';
+

@@ -4,6 +4,7 @@ import helmet from 'helmet';
 
 import { env } from './config/env';
 import { buildAuthModule } from './modules/auth';
+import { buildDashboardModule } from './modules/dashboard';
 import { errorHandler } from './shared/errors/errorHandler';
 
 export function createApp() {
@@ -23,6 +24,9 @@ export function createApp() {
 
   const { authRouter } = buildAuthModule();
   app.use('/api/auth', authRouter);
+
+  const { dashboardRouter } = buildDashboardModule();
+  app.use('/api/dashboard', dashboardRouter);
 
   app.use(errorHandler);
 

@@ -7,6 +7,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum CaseStatus {
+  OPEN
+  ACTIVE
+  CLOSED
+  WON
+  LOST
+}
+
+enum HearingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  ADJOURNED
+}
+
+enum DeadlineStatus {
+  PENDING
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum ActivityType {
+  CASE_CREATED
+  CASE_UPDATED
+  CASE_CLOSED
+  HEARING_SCHEDULED
+  DEADLINE_ADDED
+  INVOICE_CREATED
+  INVOICE_PAID
+  CLIENT_ADDED
+  NOTE
+  OTHER
+}
+
 model User {
   id           String   @id @default(uuid())
   fullName     String
@@ -15,5 +64,175 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  memberships WorkspaceMember[]
+  activities  Activity[]
+
   @@map("users")
+}
+
+/// Independent SaaS tenant. All operational data is scoped by workspaceId.
+model Workspace {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members    WorkspaceMember[]
+  clients    Client[]
+  cases      Case[]
+  hearings   Hearing[]
+  deadlines  Deadline[]
+  invoices   Invoice[]
+  activities Activity[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+  @@map("workspace_members")
+}
+
+model Client {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  email       String?
+  phone       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cases     Case[]
+  invoices  Invoice[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@map("clients")
+}
+
+model Case {
+  id            String     @id @default(uuid())
+  workspaceId   String
+  clientId      String?
+  title         String
+  status        CaseStatus @default(OPEN)
+  practiceArea  String?
+  billableHours Decimal    @default(0) @db.Decimal(12, 2)
+  openedAt      DateTime   @default(now())
+  closedAt      DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  workspace Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client?    @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  hearings  Hearing[]
+  deadlines Deadline[]
+  invoices  Invoice[]
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, practiceArea])
+  @@index([clientId])
+  @@map("cases")
+}
+
+model Hearing {
+  id          String        @id @default(uuid())
+  workspaceId String
+  caseId      String?
+  title       String
+  scheduledAt DateTime
+  status      HearingStatus @default(SCHEDULED)
+  location    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, scheduledAt])
+  @@index([workspaceId, status, scheduledAt])
+  @@index([caseId])
+  @@map("hearings")
+}
+
+model Deadline {
+  id          String         @id @default(uuid())
+  workspaceId String
+  caseId      String?
+  title       String
+  dueAt       DateTime
+  status      DeadlineStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, dueAt])
+  @@index([workspaceId, status, dueAt])
+  @@index([caseId])
+  @@map("deadlines")
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  workspaceId String
+  clientId    String?
+  caseId      String?
+  amount      Decimal       @db.Decimal(14, 2)
+  currency    String        @default("USD")
+  status      InvoiceStatus @default(DRAFT)
+  issuedAt    DateTime      @default(now())
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  case      Case?     @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, paidAt])
+  @@index([workspaceId, issuedAt])
+  @@index([clientId])
+  @@index([caseId])
+  @@map("invoices")
+}
+
+model Activity {
+  id          String       @id @default(uuid())
+  workspaceId String
+  userId      String?
+  type        ActivityType @default(OTHER)
+  title       String
+  description String?
+  entityType  String?
+  entityId    String?
+  createdAt   DateTime     @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+  @@index([userId])
+  @@map("activities")
 }

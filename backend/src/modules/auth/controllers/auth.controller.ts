@@ -24,6 +24,7 @@ export class AuthController {
         fullName: result.user.fullName,
         email: result.user.email,
       },
+      workspace: result.workspace,
     });
   });
 }

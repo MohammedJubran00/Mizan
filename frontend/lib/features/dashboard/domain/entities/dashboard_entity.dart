@@ -1,5 +1,9 @@
 import 'package:equatable/equatable.dart';
 
+import 'dashboard_charts_entity.dart';
+
+export 'dashboard_charts_entity.dart';
+
 class GreetingEntity extends Equatable {
   const GreetingEntity({
     required this.message,
@@ -290,6 +294,7 @@ class DashboardEntity extends Equatable {
     required this.activitiesPagination,
     required this.notifications,
     required this.formattedDate,
+    required this.charts,
   });
 
   final DateTime generatedAt;
@@ -303,7 +308,39 @@ class DashboardEntity extends Equatable {
   final PaginationEntity activitiesPagination;
   final NotificationSummaryEntity notifications;
   final String formattedDate;
+  final DashboardChartsEntity charts;
+
+  DashboardEntity copyWith({
+    DateTime? generatedAt,
+    GreetingEntity? greeting,
+    DashboardUserEntity? user,
+    DashboardWorkspaceEntity? workspace,
+    OverviewEntity? overview,
+    List<HearingEntity>? hearings,
+    List<DeadlineEntity>? deadlines,
+    List<ActivityGroupEntity>? activityGroups,
+    PaginationEntity? activitiesPagination,
+    NotificationSummaryEntity? notifications,
+    String? formattedDate,
+    DashboardChartsEntity? charts,
+  }) {
+    return DashboardEntity(
+      generatedAt: generatedAt ?? this.generatedAt,
+      greeting: greeting ?? this.greeting,
+      user: user ?? this.user,
+      workspace: workspace ?? this.workspace,
+      overview: overview ?? this.overview,
+      hearings: hearings ?? this.hearings,
+      deadlines: deadlines ?? this.deadlines,
+      activityGroups: activityGroups ?? this.activityGroups,
+      activitiesPagination:
+          activitiesPagination ?? this.activitiesPagination,
+      notifications: notifications ?? this.notifications,
+      formattedDate: formattedDate ?? this.formattedDate,
+      charts: charts ?? this.charts,
+    );
+  }
 
   @override
-  List<Object?> get props => [generatedAt, greeting, overview];
+  List<Object?> get props => [generatedAt, greeting, overview, charts];
 }

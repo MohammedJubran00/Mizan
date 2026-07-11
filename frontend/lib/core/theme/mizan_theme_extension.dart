@@ -23,6 +23,10 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
     required this.skeletonBase,
     required this.skeletonHighlight,
     required this.shadow,
+    required this.chartPalette,
+    required this.chartGrid,
+    required this.chartTooltipBackground,
+    required this.chartTooltipForeground,
   });
 
   final Color accent;
@@ -45,6 +49,12 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
   final Color skeletonHighlight;
   final Color shadow;
 
+  /// Ordered palette for multi-series charts (pie, stacked, legends).
+  final List<Color> chartPalette;
+  final Color chartGrid;
+  final Color chartTooltipBackground;
+  final Color chartTooltipForeground;
+
   static const light = MizanThemeExtension(
     accent: Color(0xFFEAB308),
     accentSoft: Color(0x1AEAB308),
@@ -65,6 +75,19 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
     skeletonBase: Color(0xFFE8EAEE),
     skeletonHighlight: Color(0xFFF3F4F6),
     shadow: Color(0x14000000),
+    chartPalette: [
+      Color(0xFFEAB308),
+      Color(0xFF2563EB),
+      Color(0xFF16A34A),
+      Color(0xFFEA580C),
+      Color(0xFF7C3AED),
+      Color(0xFF0891B2),
+      Color(0xFFDB2777),
+      Color(0xFF64748B),
+    ],
+    chartGrid: Color(0xFFE8EAEE),
+    chartTooltipBackground: Color(0xFF0B1424),
+    chartTooltipForeground: Color(0xFFF3F4F6),
   );
 
   static const dark = MizanThemeExtension(
@@ -87,7 +110,25 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
     skeletonBase: Color(0xFF1F1F1F),
     skeletonHighlight: Color(0xFF2A2A2A),
     shadow: Color(0x40000000),
+    chartPalette: [
+      Color(0xFFEAB308),
+      Color(0xFF3B82F6),
+      Color(0xFF22C55E),
+      Color(0xFFF97316),
+      Color(0xFFA78BFA),
+      Color(0xFF22D3EE),
+      Color(0xFFF472B6),
+      Color(0xFF94A3B8),
+    ],
+    chartGrid: Color(0xFF2A2A2A),
+    chartTooltipBackground: Color(0xFF1A1A1A),
+    chartTooltipForeground: Color(0xFFF5F5F5),
   );
+
+  Color chartColorAt(int index) {
+    if (chartPalette.isEmpty) return accent;
+    return chartPalette[index % chartPalette.length];
+  }
 
   @override
   MizanThemeExtension copyWith({
@@ -110,6 +151,10 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
     Color? skeletonBase,
     Color? skeletonHighlight,
     Color? shadow,
+    List<Color>? chartPalette,
+    Color? chartGrid,
+    Color? chartTooltipBackground,
+    Color? chartTooltipForeground,
   }) {
     return MizanThemeExtension(
       accent: accent ?? this.accent,
@@ -131,12 +176,29 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
       skeletonBase: skeletonBase ?? this.skeletonBase,
       skeletonHighlight: skeletonHighlight ?? this.skeletonHighlight,
       shadow: shadow ?? this.shadow,
+      chartPalette: chartPalette ?? this.chartPalette,
+      chartGrid: chartGrid ?? this.chartGrid,
+      chartTooltipBackground:
+          chartTooltipBackground ?? this.chartTooltipBackground,
+      chartTooltipForeground:
+          chartTooltipForeground ?? this.chartTooltipForeground,
     );
   }
 
   @override
   MizanThemeExtension lerp(ThemeExtension<MizanThemeExtension>? other, double t) {
     if (other is! MizanThemeExtension) return this;
+    final maxLen = chartPalette.length > other.chartPalette.length
+        ? chartPalette.length
+        : other.chartPalette.length;
+    final lerpedPalette = <Color>[
+      for (var i = 0; i < maxLen; i++)
+        Color.lerp(
+          chartColorAt(i),
+          other.chartColorAt(i),
+          t,
+        )!,
+    ];
     return MizanThemeExtension(
       accent: Color.lerp(accent, other.accent, t)!,
       accentSoft: Color.lerp(accentSoft, other.accentSoft, t)!,
@@ -157,6 +219,12 @@ class MizanThemeExtension extends ThemeExtension<MizanThemeExtension> {
       skeletonBase: Color.lerp(skeletonBase, other.skeletonBase, t)!,
       skeletonHighlight: Color.lerp(skeletonHighlight, other.skeletonHighlight, t)!,
       shadow: Color.lerp(shadow, other.shadow, t)!,
+      chartPalette: lerpedPalette,
+      chartGrid: Color.lerp(chartGrid, other.chartGrid, t)!,
+      chartTooltipBackground:
+          Color.lerp(chartTooltipBackground, other.chartTooltipBackground, t)!,
+      chartTooltipForeground:
+          Color.lerp(chartTooltipForeground, other.chartTooltipForeground, t)!,
     );
   }
 }

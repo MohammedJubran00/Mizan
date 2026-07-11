@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/session/session_cubit.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../cubit/activity_cubit.dart';
+import '../cubit/chart_cubit.dart';
 import '../cubit/dashboard_cubit.dart';
 import '../cubit/deadline_cubit.dart';
 import '../cubit/hearing_cubit.dart';
 import '../cubit/overview_cubit.dart';
 import '../cubit/revenue_cubit.dart';
 import '../dashboard_dependencies.dart';
+import '../widgets/charts/dashboard_charts_section.dart';
 import '../widgets/dashboard_header.dart';
 import '../widgets/dashboard_layout.dart';
 import '../widgets/deadlines_panel.dart';
@@ -34,14 +37,20 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
   void initState() {
     super.initState();
     _dashboardCubit = AppDependencies.instance.createDashboardCubit();
+    AppDependencies.instance.activeDashboardCubit = _dashboardCubit;
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _dashboardCubit.load();
+      if (!mounted) return;
+      _dashboardCubit.load();
+      _dashboardCubit.startBackgroundRefresh();
     });
   }
 
   @override
   void dispose() {
+    if (AppDependencies.instance.activeDashboardCubit == _dashboardCubit) {
+      AppDependencies.instance.activeDashboardCubit = null;
+    }
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
@@ -68,48 +77,57 @@ class _DashboardHomePageState extends State<DashboardHomePage> {
         BlocProvider<DashboardCubit>.value(value: _dashboardCubit),
         BlocProvider<OverviewCubit>.value(value: _dashboardCubit.overviewCubit),
         BlocProvider<RevenueCubit>.value(value: _dashboardCubit.revenueCubit),
+        BlocProvider<ChartCubit>.value(value: _dashboardCubit.chartCubit),
         BlocProvider<ActivityCubit>.value(value: _dashboardCubit.activityCubit),
         BlocProvider<HearingCubit>.value(value: _dashboardCubit.hearingCubit),
         BlocProvider<DeadlineCubit>.value(value: _dashboardCubit.deadlineCubit),
       ],
-      child: BlocBuilder<DashboardCubit, DashboardState>(
-        buildWhen: (prev, next) =>
-            prev.status != next.status ||
-            prev.errorMessage != next.errorMessage ||
-            prev.refreshing != next.refreshing ||
-            prev.data?.greeting != next.data?.greeting ||
-            prev.data?.formattedDate != next.data?.formattedDate ||
-            prev.data?.notifications != next.data?.notifications,
-        builder: (context, state) {
-          final data = state.data;
+      child: Builder(
+        builder: (context) {
+          return BlocBuilder<DashboardCubit, DashboardState>(
+            buildWhen: (prev, next) =>
+                prev.status != next.status ||
+                prev.errorMessage != next.errorMessage ||
+                prev.refreshing != next.refreshing ||
+                prev.data?.greeting != next.data?.greeting ||
+                prev.data?.formattedDate != next.data?.formattedDate ||
+                prev.data?.notifications != next.data?.notifications,
+            builder: (context, state) {
+              final data = state.data;
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Builder(
-                builder: (scaffoldContext) {
-                  return DashboardHeader(
-                    showMenuButton: showMenuButton,
-                    onMenuPressed: () =>
-                        Scaffold.of(scaffoldContext).openDrawer(),
-                    greeting: data?.greeting,
-                    formattedDate: data?.formattedDate,
-                    workspaceName:
-                        session.workspace?.name ?? data?.workspace.name,
-                    unreadCount:
-                        data?.notifications.unreadNotifications ?? 0,
-                    onQuickAction: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Quick actions coming soon.'),
-                        ),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Builder(
+                    builder: (scaffoldContext) {
+                      return DashboardHeader(
+                        showMenuButton: showMenuButton,
+                        onMenuPressed: () =>
+                            Scaffold.of(scaffoldContext).openDrawer(),
+                        greeting: data?.greeting,
+                        formattedDate: data?.formattedDate,
+                        workspaceName:
+                            session.workspace?.name ?? data?.workspace.name,
+                        unreadCount:
+                            data?.notifications.unreadNotifications ?? 0,
+                        onQuickAction: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Quick actions coming soon.'),
+                            ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-              Expanded(child: _DashboardBody(scrollController: _scrollController)),
-            ],
+                  ),
+                  Expanded(
+                    child: _DashboardBody(
+                      scrollController: _scrollController,
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -135,7 +153,7 @@ class _DashboardBody extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(DesignTokens.space24),
                 child: SectionError(
                   message: state.errorMessage ??
                       'Unable to load dashboard. Please try again.',
@@ -153,11 +171,11 @@ class _DashboardBody extends StatelessWidget {
               final width = constraints.maxWidth;
               final padding = EdgeInsets.symmetric(
                 horizontal: width < 600
-                    ? 16
+                    ? DesignTokens.space16
                     : width < 1100
-                        ? 24
-                        : 32,
-                vertical: 20,
+                        ? DesignTokens.space24
+                        : DesignTokens.space32,
+                vertical: DesignTokens.space20,
               );
               final crossAxisCount = width >= 1400
                   ? 5
@@ -177,15 +195,23 @@ class _DashboardBody extends StatelessWidget {
                   SliverPadding(
                     padding: padding,
                     sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        _OverviewGrid(crossAxisCount: crossAxisCount),
-                        const SizedBox(height: 24),
-                        if (useTwoColumn)
-                          const _DesktopLower()
-                        else
-                          const _MobileLower(),
-                        const SizedBox(height: 32),
-                      ]),
+                      delegate: SliverChildListDelegate(
+                        [
+                          _OverviewGrid(crossAxisCount: crossAxisCount),
+                          const SizedBox(height: DesignTokens.space24),
+                          const RepaintBoundary(
+                            child: DashboardChartsSection(),
+                          ),
+                          const SizedBox(height: DesignTokens.space24),
+                          if (useTwoColumn)
+                            const _DesktopLower()
+                          else
+                            const _MobileLower(),
+                          const SizedBox(height: DesignTokens.space32),
+                        ],
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
+                      ),
                     ),
                   ),
                 ],
@@ -254,7 +280,7 @@ class _CardsWrap extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final gap = 16.0;
+        final gap = DesignTokens.space16;
         final itemWidth =
             (constraints.maxWidth - gap * (crossAxisCount - 1)) / crossAxisCount;
         return Wrap(
@@ -283,12 +309,12 @@ class _DesktopLower extends StatelessWidget {
           child: Column(
             children: [
               _HearingsSection(),
-              SizedBox(height: 16),
+              SizedBox(height: DesignTokens.space16),
               _DeadlinesSection(),
             ],
           ),
         ),
-        SizedBox(width: 16),
+        SizedBox(width: DesignTokens.space16),
         Expanded(flex: 4, child: _ActivitySection()),
       ],
     );
@@ -303,9 +329,9 @@ class _MobileLower extends StatelessWidget {
     return const Column(
       children: [
         _HearingsSection(),
-        SizedBox(height: 16),
+        SizedBox(height: DesignTokens.space16),
         _DeadlinesSection(),
-        SizedBox(height: 16),
+        SizedBox(height: DesignTokens.space16),
         _ActivitySection(),
       ],
     );

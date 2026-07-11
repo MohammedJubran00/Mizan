@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../../core/theme/design_tokens.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import '../../domain/usecases/get_dashboard_usecase.dart';
 import 'activity_cubit.dart';
+import 'chart_cubit.dart';
 import 'deadline_cubit.dart';
 import 'hearing_cubit.dart';
 import 'overview_cubit.dart';
@@ -48,11 +52,13 @@ class DashboardState extends Equatable {
 }
 
 /// Orchestrates a single fetch and fans out slices to section cubits.
+/// Supports pull-to-refresh and lightweight background refresh.
 class DashboardCubit extends Cubit<DashboardState> {
   DashboardCubit({
     required this.getDashboard,
     required this.overviewCubit,
     required this.revenueCubit,
+    required this.chartCubit,
     required this.activityCubit,
     required this.hearingCubit,
     required this.deadlineCubit,
@@ -61,20 +67,46 @@ class DashboardCubit extends Cubit<DashboardState> {
   final GetDashboardUseCase getDashboard;
   final OverviewCubit overviewCubit;
   final RevenueCubit revenueCubit;
+  final ChartCubit chartCubit;
   final ActivityCubit activityCubit;
   final HearingCubit hearingCubit;
   final DeadlineCubit deadlineCubit;
 
   Object? _activeToken;
+  Timer? _backgroundTimer;
 
-  Future<void> load({bool refresh = false}) async {
+  /// Starts periodic background refresh (does not show full-page loading).
+  void startBackgroundRefresh() {
+    _backgroundTimer?.cancel();
+    _backgroundTimer = Timer.periodic(
+      DesignTokens.durationRefreshPoll,
+      (_) {
+        if (isClosed) return;
+        if (state.status == DashboardStatus.success) {
+          load(refresh: true, silent: true);
+        }
+      },
+    );
+  }
+
+  void stopBackgroundRefresh() {
+    _backgroundTimer?.cancel();
+    _backgroundTimer = null;
+  }
+
+  /// Call after mutations (create case, pay invoice, etc.) to soft-refresh.
+  Future<void> invalidateAfterMutation() => load(refresh: true, silent: true);
+
+  Future<void> load({bool refresh = false, bool silent = false}) async {
     if (state.status == DashboardStatus.loading && !refresh) return;
 
     _activeToken = Object();
     final token = _activeToken;
 
     if (refresh && state.data != null) {
-      emit(state.copyWith(refreshing: true, clearError: true));
+      if (!silent) {
+        emit(state.copyWith(refreshing: true, clearError: true));
+      }
     } else {
       emit(state.copyWith(
         status: DashboardStatus.loading,
@@ -83,6 +115,7 @@ class DashboardCubit extends Cubit<DashboardState> {
       ));
       overviewCubit.setLoading();
       revenueCubit.setLoading();
+      chartCubit.setLoading();
       activityCubit.setLoading();
       hearingCubit.setLoading();
       deadlineCubit.setLoading();
@@ -106,6 +139,10 @@ class DashboardCubit extends Cubit<DashboardState> {
     } on ApiException catch (e) {
       if (token != _activeToken || isClosed) return;
       if (e.message == 'Request cancelled.') return;
+      if (silent && state.data != null) {
+        emit(state.copyWith(refreshing: false));
+        return;
+      }
       _distributeError(e.message);
       emit(
         state.copyWith(
@@ -116,6 +153,10 @@ class DashboardCubit extends Cubit<DashboardState> {
       );
     } catch (_) {
       if (token != _activeToken || isClosed) return;
+      if (silent && state.data != null) {
+        emit(state.copyWith(refreshing: false));
+        return;
+      }
       const message = 'Unable to load dashboard. Please try again.';
       _distributeError(message);
       emit(
@@ -148,18 +189,10 @@ class DashboardCubit extends Cubit<DashboardState> {
         data.activityGroups,
       );
 
-      final merged = DashboardEntity(
-        generatedAt: data.generatedAt,
-        greeting: data.greeting,
-        user: data.user,
-        workspace: data.workspace,
-        overview: data.overview,
-        hearings: data.hearings,
-        deadlines: data.deadlines,
+      final merged = current.copyWith(
         activityGroups: mergedGroups,
         activitiesPagination: data.activitiesPagination,
-        notifications: data.notifications,
-        formattedDate: data.formattedDate,
+        generatedAt: data.generatedAt,
       );
 
       activityCubit.setSuccess(mergedGroups, merged.activitiesPagination);
@@ -174,7 +207,11 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   void _distribute(DashboardEntity data) {
     overviewCubit.setSuccess(data.overview);
-    revenueCubit.setSuccess(data.overview.revenue);
+    revenueCubit.setSuccess(
+      card: data.overview.revenue,
+      analytics: data.charts.revenue,
+    );
+    chartCubit.setSuccess(data.charts);
     activityCubit.setSuccess(data.activityGroups, data.activitiesPagination);
     hearingCubit.setSuccess(data.hearings);
     deadlineCubit.setSuccess(data.deadlines);
@@ -184,6 +221,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     if (state.data == null) {
       overviewCubit.setError(message);
       revenueCubit.setError(message);
+      chartCubit.setError(message);
       activityCubit.setError(message);
       hearingCubit.setError(message);
       deadlineCubit.setError(message);
@@ -192,8 +230,10 @@ class DashboardCubit extends Cubit<DashboardState> {
 
   @override
   Future<void> close() {
+    stopBackgroundRefresh();
     overviewCubit.close();
     revenueCubit.close();
+    chartCubit.close();
     activityCubit.close();
     hearingCubit.close();
     deadlineCubit.close();

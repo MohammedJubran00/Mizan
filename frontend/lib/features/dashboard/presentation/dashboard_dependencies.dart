@@ -13,6 +13,7 @@ import '../data/repositories/dashboard_repository_impl.dart';
 import '../domain/repositories/dashboard_repository.dart';
 import '../domain/usecases/get_dashboard_usecase.dart';
 import 'cubit/activity_cubit.dart';
+import 'cubit/chart_cubit.dart';
 import 'cubit/dashboard_cubit.dart';
 import 'cubit/deadline_cubit.dart';
 import 'cubit/hearing_cubit.dart';
@@ -85,10 +86,21 @@ class AppDependencies {
         getDashboard: getDashboardUseCase,
         overviewCubit: OverviewCubit(),
         revenueCubit: RevenueCubit(),
+        chartCubit: ChartCubit(),
         activityCubit: ActivityCubit(),
         hearingCubit: HearingCubit(),
         deadlineCubit: DeadlineCubit(),
       );
+
+  /// Soft-refresh hook for mutations (cases, invoices, hearings, etc.).
+  /// Wired when a dashboard cubit is active; safe no-op otherwise.
+  DashboardCubit? activeDashboardCubit;
+
+  Future<void> refreshDashboardAfterMutation() async {
+    final cubit = activeDashboardCubit;
+    if (cubit == null || cubit.isClosed) return;
+    await cubit.invalidateAfterMutation();
+  }
 
   static void reset() {
     _instance?.sessionCubit.close();

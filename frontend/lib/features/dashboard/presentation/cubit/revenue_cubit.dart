@@ -8,15 +8,17 @@ class RevenueState extends Equatable {
   const RevenueState({
     this.status = SectionStatus.initial,
     this.card,
+    this.analytics,
     this.errorMessage,
   });
 
   final SectionStatus status;
   final StatCardEntity? card;
+  final RevenueAnalyticsEntity? analytics;
   final String? errorMessage;
 
   @override
-  List<Object?> get props => [status, card, errorMessage];
+  List<Object?> get props => [status, card, analytics, errorMessage];
 }
 
 class RevenueCubit extends Cubit<RevenueState> {
@@ -24,8 +26,16 @@ class RevenueCubit extends Cubit<RevenueState> {
 
   void setLoading() => emit(const RevenueState(status: SectionStatus.loading));
 
-  void setSuccess(StatCardEntity card) => emit(
-        RevenueState(status: SectionStatus.success, card: card),
+  void setSuccess({
+    required StatCardEntity card,
+    required RevenueAnalyticsEntity analytics,
+  }) =>
+      emit(
+        RevenueState(
+          status: SectionStatus.success,
+          card: card,
+          analytics: analytics,
+        ),
       );
 
   void setError(String message) => emit(

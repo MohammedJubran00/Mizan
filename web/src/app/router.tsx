@@ -27,6 +27,11 @@ import { InvoiceFormPage } from '@/features/billing/InvoiceFormPage'
 import { PaymentsPage } from '@/features/billing/PaymentsPage'
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
 import { ComingSoonPage } from '@/features/placeholders/ComingSoonPage'
+import { RolesPage } from '@/features/users/RolesPage'
+import { UserFormPage } from '@/features/users/UserFormPage'
+import { UserProfilePage } from '@/features/users/UserProfilePage'
+import { UsersAccessPage } from '@/features/users/UsersAccessPage'
+import { UsersPage } from '@/features/users/UsersPage'
 import { RouteFallback } from '@/shared/components/RouteFallback'
 import { useAuthStore } from '@/stores/authStore'
 
@@ -303,6 +308,30 @@ export const router = createBrowserRouter([
                 <ReportPreviewPage />
               </Suspense>
             ),
+          },
+          {
+            path: '/users-permissions',
+            element: <UsersPage />,
+          },
+          {
+            path: '/users-permissions/access',
+            element: <UsersAccessPage />,
+          },
+          {
+            path: '/users-permissions/roles',
+            element: <RolesPage />,
+          },
+          {
+            path: '/users-permissions/new',
+            element: <UserFormPage mode="create" />,
+          },
+          {
+            path: '/users-permissions/:userId',
+            element: <UserProfilePage />,
+          },
+          {
+            path: '/users-permissions/:userId/edit',
+            element: <UserFormPage mode="edit" />,
           },
           ...placeholderPaths.map((path) => ({
             path,

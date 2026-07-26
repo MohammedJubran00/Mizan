@@ -56,6 +56,36 @@ const EventFormPage = lazy(() =>
   })),
 )
 
+const ReportsDashboardPage = lazy(() =>
+  import('@/features/reports/ReportsDashboardPage').then((module) => ({
+    default: module.ReportsDashboardPage,
+  })),
+)
+
+const ReportLibraryPage = lazy(() =>
+  import('@/features/reports/ReportLibraryPage').then((module) => ({
+    default: module.ReportLibraryPage,
+  })),
+)
+
+const ReportBuilderPage = lazy(() =>
+  import('@/features/reports/ReportBuilderPage').then((module) => ({
+    default: module.ReportBuilderPage,
+  })),
+)
+
+const ReportPreviewPage = lazy(() =>
+  import('@/features/reports/ReportPreviewPage').then((module) => ({
+    default: module.ReportPreviewPage,
+  })),
+)
+
+const PracticeInsightsPage = lazy(() =>
+  import('@/features/reports/PracticeInsightsPage').then((module) => ({
+    default: module.PracticeInsightsPage,
+  })),
+)
+
 function ProtectedRoute() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated())
   const location = useLocation()
@@ -225,6 +255,54 @@ export const router = createBrowserRouter([
           {
             path: '/billing/invoices/:invoiceId/edit',
             element: <InvoiceFormPage mode="edit" />,
+          },
+          {
+            path: '/reports',
+            element: (
+              <Suspense fallback={<RouteFallback />}>
+                <ReportsDashboardPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: '/reports/library',
+            element: (
+              <Suspense fallback={<RouteFallback />}>
+                <ReportLibraryPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: '/reports/builder',
+            element: (
+              <Suspense fallback={<RouteFallback />}>
+                <ReportBuilderPage mode="create" />
+              </Suspense>
+            ),
+          },
+          {
+            path: '/reports/builder/:reportId',
+            element: (
+              <Suspense fallback={<RouteFallback />}>
+                <ReportBuilderPage mode="edit" />
+              </Suspense>
+            ),
+          },
+          {
+            path: '/reports/insights',
+            element: (
+              <Suspense fallback={<RouteFallback />}>
+                <PracticeInsightsPage />
+              </Suspense>
+            ),
+          },
+          {
+            path: '/reports/:reportId',
+            element: (
+              <Suspense fallback={<RouteFallback />}>
+                <ReportPreviewPage />
+              </Suspense>
+            ),
           },
           ...placeholderPaths.map((path) => ({
             path,

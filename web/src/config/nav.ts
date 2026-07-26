@@ -151,6 +151,7 @@ export const implementedPaths = [
   '/hearings',
   '/calendar',
   '/documents',
+  '/billing',
 ]
 
 /** Destinations still rendering the shared "Coming soon" screen. */

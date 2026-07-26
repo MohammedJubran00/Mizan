@@ -21,6 +21,10 @@ import { HearingDetailsPage } from '@/features/hearings/HearingDetailsPage'
 import { HearingFormPage } from '@/features/hearings/HearingFormPage'
 import { HearingsCalendarPage } from '@/features/hearings/HearingsCalendarPage'
 import { HearingsListPage } from '@/features/hearings/HearingsListPage'
+import { BillingPage } from '@/features/billing/BillingPage'
+import { InvoiceDetailsPage } from '@/features/billing/InvoiceDetailsPage'
+import { InvoiceFormPage } from '@/features/billing/InvoiceFormPage'
+import { PaymentsPage } from '@/features/billing/PaymentsPage'
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
 import { ComingSoonPage } from '@/features/placeholders/ComingSoonPage'
 import { RouteFallback } from '@/shared/components/RouteFallback'
@@ -201,6 +205,26 @@ export const router = createBrowserRouter([
                 <DocumentsPage />
               </Suspense>
             ),
+          },
+          {
+            path: '/billing',
+            element: <BillingPage />,
+          },
+          {
+            path: '/billing/payments',
+            element: <PaymentsPage />,
+          },
+          {
+            path: '/billing/invoices/new',
+            element: <InvoiceFormPage mode="create" />,
+          },
+          {
+            path: '/billing/invoices/:invoiceId',
+            element: <InvoiceDetailsPage />,
+          },
+          {
+            path: '/billing/invoices/:invoiceId/edit',
+            element: <InvoiceFormPage mode="edit" />,
           },
           ...placeholderPaths.map((path) => ({
             path,

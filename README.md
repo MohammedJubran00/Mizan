@@ -8,6 +8,7 @@ Full-stack authentication module for Mizan.
 lawyer/
 ├── backend/   # Express.js + TypeScript + Prisma + PostgreSQL
 └── frontend/  # Flutter (Material 3, Clean Architecture)
+└── web/       # React
 ```
 
 ## Backend quick start

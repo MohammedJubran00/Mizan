@@ -144,16 +144,66 @@ export class BillingRepository {
 
   // ─── Summary ─────────────────────────────────────────────────────────────
   async summary(workspaceId: string) {
-    const [totalRevenue, outstanding, invoicesByStatus] = await Promise.all([
-      this.prisma.billing.aggregate({ where: { workspaceId, status: 'POSTED' }, _sum: { amount: true } }),
-      this.prisma.invoice.aggregate({ where: { workspaceId, status: { in: ['SENT', 'OVERDUE'] } }, _sum: { amount: true } }),
-      this.prisma.invoice.groupBy({ by: ['status'], where: { workspaceId }, _count: { id: true }, _sum: { amount: true } }),
-    ]);
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [totalRevenue, outstanding, overdueAgg, paymentsThisMonth, invoicesByStatus] =
+      await Promise.all([
+        this.prisma.billing.aggregate({
+          where: { workspaceId, status: 'POSTED' },
+          _sum: { amount: true },
+        }),
+        this.prisma.invoice.aggregate({
+          where: { workspaceId, status: { in: ['SENT', 'OVERDUE'] } },
+          _sum: { amount: true },
+          _count: { id: true },
+        }),
+        this.prisma.invoice.aggregate({
+          where: { workspaceId, status: 'OVERDUE' },
+          _count: { id: true },
+        }),
+        this.prisma.billing.aggregate({
+          where: {
+            workspaceId,
+            status: 'POSTED',
+            occurredAt: { gte: startOfMonth },
+          },
+          _sum: { amount: true },
+        }),
+        this.prisma.invoice.groupBy({
+          by: ['status'],
+          where: { workspaceId },
+          _count: { id: true },
+          _sum: { amount: true },
+        }),
+      ]);
+
+    const statusCounts = Object.fromEntries(
+      invoicesByStatus.map((row) => [row.status, row._count.id]),
+    ) as Record<string, number>;
+
+    const paidInvoiceCount = statusCounts.PAID ?? 0;
+    const overdueInvoiceCount = statusCounts.OVERDUE ?? overdueAgg._count.id ?? 0;
+    const issuedInvoiceCount = invoicesByStatus.reduce((sum, row) => sum + row._count.id, 0);
+    const paidProgress =
+      issuedInvoiceCount === 0 ? 0 : (paidInvoiceCount / issuedInvoiceCount) * 100;
 
     return {
       totalRevenue: Number(totalRevenue._sum.amount ?? 0),
+      outstandingBalance: Number(outstanding._sum.amount ?? 0),
       outstanding: Number(outstanding._sum.amount ?? 0),
-      invoicesByStatus: invoicesByStatus.map((r) => ({ status: r.status, count: r._count.id, total: Number(r._sum.amount ?? 0) })),
+      paidInvoiceCount,
+      overdueInvoiceCount,
+      paymentsThisMonth: Number(paymentsThisMonth._sum.amount ?? 0),
+      currency: 'USD',
+      urgentOutstandingCount: overdueInvoiceCount,
+      paidProgress: Math.round(paidProgress * 10) / 10,
+      invoicesByStatus: invoicesByStatus.map((r) => ({
+        status: r.status,
+        count: r._count.id,
+        total: Number(r._sum.amount ?? 0),
+      })),
     };
   }
 }

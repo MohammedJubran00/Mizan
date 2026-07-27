@@ -37,6 +37,42 @@ function emptyPagination(page: number, pageSize: number): BillingPagination {
   return { page, pageSize, total: 0, totalPages: 0, hasMore: false }
 }
 
+function toApiInvoiceBody(payload: Partial<InvoicePayload>) {
+  const items = (payload.items ?? []).map((item, index) => ({
+    description: item.description,
+    quantity: item.quantity,
+    rate: item.rate,
+    taxRate: item.taxRate ?? 0,
+    discountRate: item.discountRate ?? 0,
+    sortOrder: index,
+  }))
+
+  const amount = items.reduce((sum, item) => {
+    const gross = item.quantity * item.rate
+    const afterDiscount = gross * (1 - item.discountRate / 100)
+    return sum + afterDiscount * (1 + item.taxRate / 100)
+  }, 0)
+
+  const stamp = new Date()
+  const number = `INV-${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}-${String(stamp.getTime()).slice(-5)}`
+
+  return {
+    clientId: payload.clientId || null,
+    caseId: payload.caseId || null,
+    billingLawyerUserId: payload.billingLawyerId || null,
+    number,
+    amount,
+    currency: payload.currency ?? 'USD',
+    status: payload.status ?? 'DRAFT',
+    issuedAt: payload.issueDate || undefined,
+    dueAt: payload.dueDate || null,
+    terms: payload.terms || 'NET_30',
+    paymentInstructions: payload.paymentInstructions || null,
+    caseSummary: payload.caseSummary || null,
+    items,
+  }
+}
+
 export const billingService = {
   async getInvoices(params: InvoiceListParams): Promise<InvoiceListResponse> {
     try {
@@ -69,7 +105,7 @@ export const billingService = {
     try {
       const { data } = await apiClient.post<{ success: boolean; data: InvoiceDetails }>(
         endpoints.billing.invoices,
-        payload,
+        toApiInvoiceBody(payload),
       )
       return data.data ?? null
     } catch (error) {
@@ -79,9 +115,12 @@ export const billingService = {
 
   async updateInvoice(id: string, payload: Partial<InvoicePayload>): Promise<InvoiceDetails | null> {
     try {
+      const body = toApiInvoiceBody(payload as InvoicePayload)
+      // Keep existing invoice number on update — omit generated number.
+      const { number: _number, ...updateBody } = body
       const { data } = await apiClient.patch<{ success: boolean; data: InvoiceDetails }>(
         endpoints.billing.invoice(id),
-        payload,
+        updateBody,
       )
       return data.data ?? null
     } catch (error) {
@@ -171,10 +210,41 @@ export const billingService = {
 
   async getRevenueSummary(): Promise<BillingSummary | null> {
     try {
-      const { data } = await apiClient.get<{ success: boolean; data: BillingSummary }>(
+      const { data } = await apiClient.get<{ success: boolean; data: any }>(
         endpoints.billing.summary,
       )
-      return data.data ?? null
+      const raw = data.data
+      if (!raw) return null
+
+      const byStatus: Array<{ status: string; count: number; total: number }> =
+        raw.invoicesByStatus ?? []
+      const countFor = (status: string) =>
+        byStatus.find((row) => row.status === status)?.count ?? 0
+
+      const paidInvoiceCount = Number(raw.paidInvoiceCount ?? countFor('PAID'))
+      const overdueInvoiceCount = Number(
+        raw.overdueInvoiceCount ?? countFor('OVERDUE'),
+      )
+      const issuedCount = byStatus.reduce((sum, row) => sum + row.count, 0)
+      const paidProgress = Number(
+        raw.paidProgress ??
+          (issuedCount === 0 ? 0 : (paidInvoiceCount / issuedCount) * 100),
+      )
+
+      return {
+        totalRevenue: Number(raw.totalRevenue ?? 0),
+        outstandingBalance: Number(
+          raw.outstandingBalance ?? raw.outstanding ?? 0,
+        ),
+        paidInvoiceCount,
+        overdueInvoiceCount,
+        paymentsThisMonth: Number(raw.paymentsThisMonth ?? 0),
+        currency: raw.currency ?? 'USD',
+        urgentOutstandingCount: Number(
+          raw.urgentOutstandingCount ?? overdueInvoiceCount,
+        ),
+        paidProgress,
+      }
     } catch {
       return null
     }
@@ -212,12 +282,15 @@ export const billingService = {
       const { data } = await apiClient.get<{ items: any[] }>(endpoints.clients.root, {
         params: { search: search || undefined, pageSize: 20 },
       })
-      return (data.items ?? []).map((c: any) => ({
-        id: c.id,
-        name: c.fullName ?? c.name ?? '',
-        email: c.email ?? null,
-        avatarUrl: c.avatarUrl ?? null,
-      }))
+      return (data.items ?? [])
+        .map((c: any) => ({
+          id: c.id,
+          fullName: c.fullName ?? c.name ?? c.companyName ?? 'Unnamed client',
+          email: c.email ?? null,
+          subtitle: c.companyName ?? c.email ?? null,
+          avatarUrl: c.avatarUrl ?? null,
+        }))
+        .filter((c) => Boolean(c.id))
     } catch {
       return []
     }
@@ -226,15 +299,20 @@ export const billingService = {
   async searchCases(search?: string, clientId?: string): Promise<BillingCaseRef[]> {
     try {
       const { data } = await apiClient.get<{ items: any[] }>(endpoints.cases.root, {
-        params: { search: search || undefined, clientId: clientId || undefined, pageSize: 20 },
+        params: {
+          search: search || undefined,
+          clientId: clientId || undefined,
+          pageSize: 20,
+        },
       })
-      return (data.items ?? []).map((c: any) => ({
-        id: c.id,
-        reference: c.caseNumber ?? c.id,
-        title: c.title,
-        clientId: c.client?.id ?? null,
-        clientName: c.client?.name ?? null,
-      }))
+      return (data.items ?? [])
+        .map((c: any) => ({
+          id: c.id,
+          caseNumber: c.caseNumber ?? c.id?.slice?.(0, 8)?.toUpperCase?.() ?? 'CASE',
+          title: c.title ?? 'Untitled case',
+          clientId: c.client?.id ?? null,
+        }))
+        .filter((c) => Boolean(c.id))
     } catch {
       return []
     }
@@ -243,14 +321,17 @@ export const billingService = {
   async searchLawyers(search?: string): Promise<BillingPersonRef[]> {
     try {
       const { data } = await apiClient.get<{ items: any[] }>(endpoints.users.root, {
-        params: { search: search || undefined, role: 'LAWYER', pageSize: 20 },
+        params: { search: search || undefined, pageSize: 50 },
       })
-      return (data.items ?? []).map((m: any) => ({
-        id: m.userId ?? m.id,
-        name: m.user?.fullName ?? m.fullName ?? '',
-        email: m.user?.email ?? m.email ?? null,
-        avatarUrl: m.user?.avatarUrl ?? null,
-      }))
+      return (data.items ?? [])
+        .map((m: any) => ({
+          id: m.userId ?? m.user?.id ?? m.id,
+          fullName: m.user?.fullName ?? m.fullName ?? 'Team member',
+          email: m.user?.email ?? m.email ?? null,
+          subtitle: m.role ?? m.jobTitle ?? null,
+          avatarUrl: m.user?.avatarUrl ?? m.avatarUrl ?? null,
+        }))
+        .filter((m) => Boolean(m.id))
     } catch {
       return []
     }

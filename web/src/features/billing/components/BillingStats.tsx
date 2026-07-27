@@ -77,7 +77,7 @@ export function BillingStats({ summary, loading }: BillingStatsProps) {
         icon={Receipt}
         hint={
           summary
-            ? `${formatPercent(summary.paidProgress)} of issued invoices`
+            ? `${formatPercent(summary.paidProgress ?? 0)} of issued invoices`
             : undefined
         }
       />

@@ -60,6 +60,7 @@ export function HearingFilters({
 
       <Select
         aria-label="Filter by status"
+        fullWidth={false}
         className={compactSelect}
         options={[{ value: 'ALL', label: 'All statuses' }, ...hearingStatusOptions]}
         value={status}
@@ -70,6 +71,7 @@ export function HearingFilters({
 
       <Select
         aria-label="Filter by type"
+        fullWidth={false}
         className={compactSelect}
         options={[{ value: 'ALL', label: 'All types' }, ...hearingTypeOptions]}
         value={type}
@@ -80,6 +82,7 @@ export function HearingFilters({
 
       <Select
         aria-label="Sort hearings"
+        fullWidth={false}
         className={compactSelect}
         options={hearingSortOptions}
         value={sort}

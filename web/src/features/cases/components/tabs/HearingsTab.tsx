@@ -184,6 +184,7 @@ export function HearingsTab({ caseDetails }: { caseDetails: CaseDetails }) {
 
             <Select
               aria-label="Filter hearings by status"
+              fullWidth={false}
               className="h-9 w-auto min-w-36 bg-white pl-3 pr-9"
               options={statusOptions}
               value={status}

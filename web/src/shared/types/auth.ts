@@ -26,4 +26,5 @@ export interface ApiErrorBody {
   success?: boolean
   message?: string
   error?: string
+  errors?: Array<{ field?: string; message?: string }>
 }

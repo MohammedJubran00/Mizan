@@ -25,6 +25,8 @@ import type {
 import { Button } from '@/shared/components/Button'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
 import { formatBytes } from '@/shared/lib/utils'
+import { caseKeys } from '@/features/cases/hooks/useCaseQueries'
+import { clientKeys } from '@/features/clients/hooks/useClientQueries'
 
 /** Mirrors the API's MAX_UPLOAD_MB so the dialog can reject oversized files early. */
 const MAX_UPLOAD_MB = Number(import.meta.env.VITE_MAX_UPLOAD_MB ?? 25)
@@ -108,7 +110,11 @@ export function DocumentsPage() {
       setUploadOpen(false)
       setUploadProgress(0)
       setUploadError(null)
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+        queryClient.invalidateQueries({ queryKey: caseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: clientKeys.all }),
+      ])
       setSelectedId(document.id)
     },
     onError: (error: Error) => setUploadError(error.message),
@@ -119,7 +125,13 @@ export function DocumentsPage() {
       id: string
       payload: Parameters<typeof updateDocument>[1]
     }) => updateDocument(params.id, params.payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents'] }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+        queryClient.invalidateQueries({ queryKey: caseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: clientKeys.all }),
+      ])
+    },
     onError: (error: Error) => setActionError(error.message),
   })
 
@@ -129,7 +141,11 @@ export function DocumentsPage() {
       setPendingDelete(null)
       queryClient.removeQueries({ queryKey: ['document-file', id] })
       if (selectedId === id) setSelectedId(null)
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+        queryClient.invalidateQueries({ queryKey: caseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: clientKeys.all }),
+      ])
     },
     onError: (error: Error) => setActionError(error.message),
   })

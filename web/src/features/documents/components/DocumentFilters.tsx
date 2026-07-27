@@ -71,12 +71,12 @@ export function DocumentFilters({
         onChange={(event) => onCaseChange(event.target.value)}
         aria-label="Filter by case"
         className={selectClass}
-        disabled={!facets?.cases.length}
       >
         <option value="">All cases</option>
         {facets?.cases.map((item) => (
           <option key={item.id} value={item.id}>
-            {item.label} ({item.count})
+            {item.label}
+            {item.count ? ` (${item.count})` : ''}
           </option>
         ))}
       </select>
@@ -86,12 +86,12 @@ export function DocumentFilters({
         onChange={(event) => onClientChange(event.target.value)}
         aria-label="Filter by client"
         className={selectClass}
-        disabled={!facets?.clients.length}
       >
         <option value="">All clients</option>
         {facets?.clients.map((item) => (
           <option key={item.id} value={item.id}>
-            {item.label} ({item.count})
+            {item.label}
+            {item.count ? ` (${item.count})` : ''}
           </option>
         ))}
       </select>

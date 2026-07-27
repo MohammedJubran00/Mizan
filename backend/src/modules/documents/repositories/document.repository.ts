@@ -116,47 +116,51 @@ export class DocumentRepository {
   }
 
   async facets(workspaceId: string) {
-    const [categories, cases, clients] = await Promise.all([
-      this.prisma.document.groupBy({
-        by: ['category'],
-        where: { workspaceId },
-        _count: { _all: true },
-      }),
-      this.prisma.document.groupBy({
-        by: ['caseId'],
-        where: { workspaceId, caseId: { not: null } },
-        _count: { _all: true },
-      }),
-      this.prisma.document.groupBy({
-        by: ['clientId'],
-        where: { workspaceId, clientId: { not: null } },
-        _count: { _all: true },
-      }),
-    ]);
+    // Offer every workspace case/client in upload + filter dropdowns — not only
+    // entities that already have documents (otherwise Unlinked stays the only option).
+    const [categories, caseCounts, clientCounts, caseRows, clientRows] =
+      await Promise.all([
+        this.prisma.document.groupBy({
+          by: ['category'],
+          where: { workspaceId },
+          _count: { _all: true },
+        }),
+        this.prisma.document.groupBy({
+          by: ['caseId'],
+          where: { workspaceId, caseId: { not: null } },
+          _count: { _all: true },
+        }),
+        this.prisma.document.groupBy({
+          by: ['clientId'],
+          where: { workspaceId, clientId: { not: null } },
+          _count: { _all: true },
+        }),
+        this.prisma.case.findMany({
+          where: { workspaceId },
+          select: { id: true, title: true, caseNumber: true, clientId: true },
+          orderBy: { title: 'asc' },
+          take: 500,
+        }),
+        this.prisma.client.findMany({
+          where: { workspaceId },
+          select: { id: true, name: true },
+          orderBy: { name: 'asc' },
+          take: 500,
+        }),
+      ]);
 
-    const caseIds = cases
-      .map((row) => row.caseId)
-      .filter((id): id is string => Boolean(id));
-    const clientIds = clients
-      .map((row) => row.clientId)
-      .filter((id): id is string => Boolean(id));
+    return { categories, caseCounts, clientCounts, caseRows, clientRows };
+  }
 
-    const [caseRows, clientRows] = await Promise.all([
-      caseIds.length
-        ? this.prisma.case.findMany({
-            where: { id: { in: caseIds }, workspaceId },
-            select: { id: true, title: true, caseNumber: true },
-          })
-        : Promise.resolve([]),
-      clientIds.length
-        ? this.prisma.client.findMany({
-            where: { id: { in: clientIds }, workspaceId },
-            select: { id: true, name: true },
-          })
-        : Promise.resolve([]),
-    ]);
-
-    return { categories, cases, clients, caseRows, clientRows };
+  async findCaseClientId(
+    workspaceId: string,
+    caseId: string,
+  ): Promise<string | null> {
+    const row = await this.prisma.case.findFirst({
+      where: { id: caseId, workspaceId },
+      select: { clientId: true },
+    });
+    return row?.clientId ?? null;
   }
 
   /** Confirms a case belongs to the workspace before linking. */

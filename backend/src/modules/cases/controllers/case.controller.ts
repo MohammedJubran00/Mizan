@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../../../shared/utils/asyncHandler';
 import { routeParam } from '../../../shared/utils/routeParam';
 import type { CaseService } from '../services/case.service';
-import { listCasesSchema, updateCaseStatusSchema } from '../dto/case.dto';
+import { listCasesSchema, updateCaseStatusSchema, createCaseNoteSchema } from '../dto/case.dto';
 import { z } from 'zod';
 
 export class CaseController {
@@ -44,6 +44,13 @@ export class CaseController {
     const { status } = updateCaseStatusSchema.parse(req.body);
     const data = await this.service.update(auth, routeParam(req.params, 'id'), { status });
     res.json({ success: true, data });
+  });
+
+  createNote = asyncHandler(async (req: Request, res: Response) => {
+    const auth = (req as any).auth;
+    const input = createCaseNoteSchema.parse(req.body);
+    const data = await this.service.createNote(auth, routeParam(req.params, 'id'), input);
+    res.status(201).json({ success: true, data });
   });
 
   delete = asyncHandler(async (req: Request, res: Response) => {

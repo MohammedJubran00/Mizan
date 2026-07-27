@@ -53,6 +53,8 @@ export interface DocumentFacetOption {
   id: string
   label: string
   count: number
+  /** On case options: the case's client, used to auto-link on upload. */
+  clientId?: string | null
 }
 
 export interface DocumentFacets {

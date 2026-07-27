@@ -130,7 +130,7 @@ export function CaseTable({
       header: 'Practice area',
       render: (row) => (
         <span className="text-text-secondary">
-          {practiceAreaLabels[row.practiceArea]}
+          {practiceAreaLabels[row.practiceArea] ?? row.practiceArea}
         </span>
       ),
     },

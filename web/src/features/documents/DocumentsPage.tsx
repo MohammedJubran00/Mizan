@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Upload } from 'lucide-react'
+import {
+  CalendarDays,
+  FileStack,
+  HardDrive,
+  Link2Off,
+  Upload,
+} from 'lucide-react'
 
 import { TopBar } from '@/app/layout/TopBar'
 import {
@@ -11,8 +17,10 @@ import {
   uploadDocument,
 } from '@/features/documents/api'
 import { DocumentDetails } from '@/features/documents/components/DocumentDetails'
+import { DeleteDocumentDialog } from '@/features/documents/components/DeleteDocumentDialog'
+import { DocumentEmptyState } from '@/features/documents/components/DocumentEmptyState'
 import { DocumentFilters } from '@/features/documents/components/DocumentFilters'
-import { DocumentTable } from '@/features/documents/components/DocumentTable'
+import { DocumentList } from '@/features/documents/components/DocumentList'
 import { PdfViewer } from '@/features/documents/components/PdfViewer'
 import { UploadDialog } from '@/features/documents/components/UploadDialog'
 import type {
@@ -21,13 +29,15 @@ import type {
   DocumentSortField,
   SortDirection,
 } from '@/features/documents/types'
+import { caseKeys } from '@/features/cases/hooks/useCaseQueries'
+import { clientKeys } from '@/features/clients/hooks/useClientQueries'
 import { Button } from '@/shared/components/Button'
 import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
-import { formatBytes } from '@/shared/lib/utils'
+import { formatBytes, formatCount } from '@/shared/lib/utils'
 
 /** Mirrors the API's MAX_UPLOAD_MB so the dialog can reject oversized files early. */
 const MAX_UPLOAD_MB = Number(import.meta.env.VITE_MAX_UPLOAD_MB ?? 25)
-const PAGE_SIZE = 25
+const PAGE_SIZE = 10
 
 /** Stable reference so selection effects don't re-run on every render. */
 const NO_ITEMS: DocumentItem[] = []
@@ -44,6 +54,7 @@ export function DocumentsPage() {
   const [page, setPage] = useState(1)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -53,6 +64,7 @@ export function DocumentsPage() {
 
   useEffect(() => {
     setPage(1)
+    setSelectedId(null)
   }, [debouncedSearch, category, caseId, clientId, sortBy, sortDir])
 
   const listQuery = useQuery({
@@ -74,22 +86,22 @@ export function DocumentsPage() {
   })
 
   const items = listQuery.data?.items ?? NO_ITEMS
+  const pagination = listQuery.data?.pagination
+  const summary = listQuery.data?.summary
 
   const selected = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
     [items, selectedId],
   )
 
-  // Keep a document selected as the user filters or paginates.
+  // Preserve selection only while the document remains on the current page.
   useEffect(() => {
-    if (!items.length) {
-      setSelectedId(null)
-      return
-    }
+    if (!selectedId) return
+    if (listQuery.isFetching) return
     if (!items.some((item) => item.id === selectedId)) {
-      setSelectedId(items[0].id)
+      setSelectedId(null)
     }
-  }, [items, selectedId])
+  }, [items, selectedId, listQuery.isFetching])
 
   const previewQuery = useQuery({
     queryKey: ['document-file', selectedId],
@@ -106,8 +118,13 @@ export function DocumentsPage() {
       setUploadOpen(false)
       setUploadProgress(0)
       setUploadError(null)
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      setPage(1)
       setSelectedId(document.id)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+        queryClient.invalidateQueries({ queryKey: caseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: clientKeys.all }),
+      ])
     },
     onError: (error: Error) => setUploadError(error.message),
   })
@@ -117,16 +134,27 @@ export function DocumentsPage() {
       id: string
       payload: Parameters<typeof updateDocument>[1]
     }) => updateDocument(params.id, params.payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['documents'] }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+        queryClient.invalidateQueries({ queryKey: caseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: clientKeys.all }),
+      ])
+    },
     onError: (error: Error) => setActionError(error.message),
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteDocument(id),
     onSuccess: async (_result, id) => {
+      setPendingDelete(null)
       queryClient.removeQueries({ queryKey: ['document-file', id] })
       if (selectedId === id) setSelectedId(null)
-      await queryClient.invalidateQueries({ queryKey: ['documents'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+        queryClient.invalidateQueries({ queryKey: caseKeys.all }),
+        queryClient.invalidateQueries({ queryKey: clientKeys.all }),
+      ])
     },
     onError: (error: Error) => setActionError(error.message),
   })
@@ -173,18 +201,12 @@ export function DocumentsPage() {
   }
 
   const hasActiveFilters = Boolean(search || category || caseId || clientId)
-  const summary = listQuery.data?.summary
-  const pagination = listQuery.data?.pagination
 
   return (
     <>
       <TopBar
         title="Documents"
-        subtitle={
-          summary
-            ? `${summary.total} document${summary.total === 1 ? '' : 's'} · ${formatBytes(summary.totalSizeBytes)} stored · ${summary.uploadedThisMonth} this month`
-            : 'Filings, contracts, and shared work product'
-        }
+        subtitle="Filings, contracts, and shared work product"
         actions={
           <Button
             size="sm"
@@ -199,7 +221,7 @@ export function DocumentsPage() {
         }
       />
 
-      <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
         {listQuery.isError ? (
           <div className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
             {listQuery.error instanceof Error
@@ -221,6 +243,31 @@ export function DocumentsPage() {
           </div>
         ) : null}
 
+        {summary ? (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryTile
+              icon={FileStack}
+              label="Documents"
+              value={formatCount(summary.total)}
+            />
+            <SummaryTile
+              icon={HardDrive}
+              label="Storage used"
+              value={formatBytes(summary.totalSizeBytes)}
+            />
+            <SummaryTile
+              icon={CalendarDays}
+              label="Uploaded this month"
+              value={formatCount(summary.uploadedThisMonth)}
+            />
+            <SummaryTile
+              icon={Link2Off}
+              label="Unlinked"
+              value={formatCount(summary.unlinkedCount)}
+            />
+          </div>
+        ) : null}
+
         <DocumentFilters
           search={search}
           onSearchChange={setSearch}
@@ -235,79 +282,58 @@ export function DocumentsPage() {
           hasActiveFilters={hasActiveFilters}
         />
 
-        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-          <div className="flex min-w-0 flex-col gap-4">
-            <DocumentTable
+        <div className="grid min-h-[calc(100dvh-17rem)] flex-1 gap-4 xl:grid-cols-[minmax(19rem,22.5rem)_minmax(0,1fr)]">
+          <div className="min-h-[28rem] xl:min-h-0">
+            <DocumentList
               items={items}
               loading={listQuery.isLoading}
               selectedId={selectedId}
               onSelect={(item: DocumentItem) => setSelectedId(item.id)}
-              onDelete={(item) => {
-                if (
-                  window.confirm(
-                    `Delete "${item.title}"? This removes the file permanently.`,
-                  )
-                ) {
-                  deleteMutation.mutate(item.id)
-                }
-              }}
+              onDelete={(item) => setPendingDelete(item)}
               sortBy={sortBy}
               sortDir={sortDir}
               onSort={handleSort}
+              page={pagination?.page ?? page}
+              totalPages={pagination?.totalPages ?? 0}
+              total={pagination?.total ?? 0}
+              hasMore={pagination?.hasMore ?? false}
+              onPreviousPage={() => setPage((value) => Math.max(1, value - 1))}
+              onNextPage={() => setPage((value) => value + 1)}
             />
-
-            {pagination && pagination.totalPages > 1 ? (
-              <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm">
-                <span className="text-xs text-text-muted">
-                  Page {pagination.page} of {pagination.totalPages} ·{' '}
-                  {pagination.total} total
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page <= 1}
-                    onClick={() => setPage((value) => Math.max(1, value - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={!pagination.hasMore}
-                    onClick={() => setPage((value) => value + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {selected ? (
-              <DocumentDetails
-                document={selected}
-                saving={updateMutation.isPending}
-                onSave={(payload) =>
-                  updateMutation.mutate({ id: selected.id, payload })
-                }
-              />
-            ) : null}
           </div>
 
-          <div className="min-h-[32rem] xl:sticky xl:top-20 xl:h-[calc(100vh-7rem)]">
-            <PdfViewer
-              blob={previewQuery.data ?? null}
-              loading={previewQuery.isLoading}
-              error={
-                previewQuery.isError
-                  ? previewQuery.error instanceof Error
-                    ? previewQuery.error.message
-                    : 'Unable to preview this document.'
-                  : null
-              }
-              onDownload={() => void handleDownload()}
-              downloading={downloading}
-            />
+          <div className="flex min-w-0 flex-col gap-4">
+            {selected ? (
+              <>
+                <DocumentDetails
+                  document={selected}
+                  saving={updateMutation.isPending}
+                  downloading={downloading}
+                  onSave={(payload) =>
+                    updateMutation.mutate({ id: selected.id, payload })
+                  }
+                  onDelete={() => setPendingDelete(selected)}
+                  onDownload={() => void handleDownload()}
+                />
+                <div className="min-h-[24rem] flex-1">
+                  <PdfViewer
+                    blob={previewQuery.data ?? null}
+                    loading={previewQuery.isLoading}
+                    error={
+                      previewQuery.isError
+                        ? previewQuery.error instanceof Error
+                          ? previewQuery.error.message
+                          : 'Unable to preview this document.'
+                        : null
+                    }
+                    onDownload={() => void handleDownload()}
+                    downloading={downloading}
+                  />
+                </div>
+              </>
+            ) : (
+              <DocumentEmptyState />
+            )}
           </div>
         </div>
       </main>
@@ -325,6 +351,40 @@ export function DocumentsPage() {
         error={uploadError}
         onSubmit={(payload) => uploadMutation.mutate(payload)}
       />
+
+      <DeleteDocumentDialog
+        open={Boolean(pendingDelete)}
+        documentTitle={pendingDelete?.title ?? ''}
+        deleting={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteMutation.mutate(pendingDelete.id)
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </>
+  )
+}
+
+function SummaryTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof FileStack
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-white px-4 py-3 shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-soft text-blue">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
+          {label}
+        </p>
+        <p className="truncate font-display text-xl text-navy">{value}</p>
+      </div>
+    </div>
   )
 }

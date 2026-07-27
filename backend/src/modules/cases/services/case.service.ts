@@ -3,7 +3,7 @@ import { AppError } from '../../../shared/errors/AppError';
 import type { AuthContext } from '../../../shared/types/auth-context';
 import type { ActivityEngineService } from '../../dashboard/statistics/activity-engine.service';
 import type { CacheInvalidator } from '../../../shared/cache/cache-invalidator';
-import type { CreateCaseInput, ListCasesQuery, UpdateCaseInput } from '../dto/case.dto';
+import type { CreateCaseInput, CreateCaseNoteInput, ListCasesQuery, UpdateCaseInput } from '../dto/case.dto';
 import type { CaseRepository } from '../repositories/case.repository';
 import type { CaseRow } from '../repositories/case.repository';
 
@@ -101,7 +101,7 @@ function mapCase(row: CaseRow) {
     counters: {
       hearings: row.hearings.length,
       documents: row.documents.length,
-      notes: 0,
+      notes: row.notes.length,
     },
     billing: mapBilling(row),
     milestones: {
@@ -146,7 +146,14 @@ function mapCase(row: CaseRow) {
       mimeType: doc.mimeType,
       createdAt: doc.createdAt.toISOString(),
     })),
-    notes: [],
+    notes: row.notes.map((note) => ({
+      id: note.id,
+      title: note.title ?? null,
+      body: note.body,
+      authorName: note.author?.fullName ?? null,
+      shared: note.shared,
+      createdAt: note.createdAt.toISOString(),
+    })),
   };
 }
 
@@ -256,5 +263,26 @@ export class CaseService {
     const count = await this.repository.bulkDelete(auth.workspaceId, ids);
     await this.cacheInvalidator?.invalidateForMutation(auth.workspaceId, 'CASE_UPDATED');
     return count;
+  }
+
+  async createNote(auth: AuthContext, caseId: string, input: CreateCaseNoteInput) {
+    const note = await this.repository.createNote(auth.workspaceId, caseId, {
+      title: input.title?.trim() || null,
+      body: input.body.trim(),
+      authorId: auth.user.id,
+      shared: input.shared ?? false,
+    });
+    if (!note) throw new AppError(404, 'Case not found.');
+
+    await this.cacheInvalidator?.invalidateForMutation(auth.workspaceId, 'CASE_UPDATED');
+
+    return {
+      id: note.id,
+      title: note.title ?? null,
+      body: note.body,
+      authorName: note.author?.fullName ?? auth.user.fullName,
+      shared: note.shared,
+      createdAt: note.createdAt.toISOString(),
+    };
   }
 }

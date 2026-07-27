@@ -85,7 +85,7 @@ export class DocumentService {
     file: UploadedPdf,
     input: CreateDocumentInput,
   ): Promise<DocumentDto> {
-    await this.assertLinksBelongToWorkspace(auth.workspaceId, {
+    const links = await this.resolveLinks(auth.workspaceId, {
       caseId: input.caseId,
       clientId: input.clientId,
     });
@@ -100,8 +100,8 @@ export class DocumentService {
     try {
       const row = await this.repository.create({
         workspaceId: auth.workspaceId,
-        caseId: input.caseId ?? null,
-        clientId: input.clientId ?? null,
+        caseId: links.caseId,
+        clientId: links.clientId,
         uploadedById: auth.user.id,
         title,
         description: input.description ?? null,
@@ -119,6 +119,10 @@ export class DocumentService {
         documentId: row.id,
         name: row.title,
       });
+      await this.cacheInvalidator?.invalidateForMutation(
+        auth.workspaceId,
+        'DOCUMENT_UPLOADED',
+      );
 
       return mapDocument(row);
     } catch (error) {
@@ -139,22 +143,30 @@ export class DocumentService {
       throw new AppError(404, 'Document not found.');
     }
 
-    await this.assertLinksBelongToWorkspace(auth.workspaceId, {
-      caseId: input.caseId ?? undefined,
-      clientId: input.clientId ?? undefined,
-    });
-
     const data: UpdateDocumentRecord = {};
     if (input.title !== undefined) data.title = input.title;
     if (input.description !== undefined) data.description = input.description;
     if (input.category !== undefined) data.category = input.category;
-    if (input.caseId !== undefined) data.caseId = input.caseId;
-    if (input.clientId !== undefined) data.clientId = input.clientId;
+
+    if (input.caseId !== undefined || input.clientId !== undefined) {
+      const links = await this.resolveLinks(auth.workspaceId, {
+        caseId:
+          input.caseId !== undefined ? input.caseId : existing.caseId,
+        clientId:
+          input.clientId !== undefined ? input.clientId : existing.clientId,
+      });
+      if (input.caseId !== undefined) data.caseId = links.caseId;
+      if (input.clientId !== undefined || input.caseId !== undefined) {
+        data.clientId = links.clientId;
+      }
+    }
 
     const row = await this.repository.update(auth.workspaceId, id, data);
 
     await this.cacheInvalidator?.invalidateDomains(auth.workspaceId, [
       'documents',
+      'cases',
+      'clients',
     ]);
 
     return mapDocument(row);
@@ -176,6 +188,10 @@ export class DocumentService {
       documentId: existing.id,
       name: existing.title,
     });
+    await this.cacheInvalidator?.invalidateForMutation(
+      auth.workspaceId,
+      'DOCUMENT_DELETED',
+    );
   }
 
   async openFile(auth: AuthContext, id: string): Promise<DocumentFileStream> {
@@ -196,33 +212,49 @@ export class DocumentService {
     };
   }
 
-  private async assertLinksBelongToWorkspace(
+  /**
+   * Validates case/client IDs and, when a case is chosen without a client,
+   * derives the case's client so the document appears on both sides.
+   */
+  private async resolveLinks(
     workspaceId: string,
-    links: { caseId?: string; clientId?: string },
-  ): Promise<void> {
-    if (links.caseId && !(await this.repository.caseExists(workspaceId, links.caseId))) {
+    links: {
+      caseId?: string | null;
+      clientId?: string | null;
+    },
+  ): Promise<{ caseId: string | null; clientId: string | null }> {
+    const caseId = links.caseId ?? null;
+    let clientId = links.clientId ?? null;
+
+    if (caseId && !(await this.repository.caseExists(workspaceId, caseId))) {
       throw new AppError(400, 'Linked case was not found in this workspace.');
     }
 
-    if (
-      links.clientId &&
-      !(await this.repository.clientExists(workspaceId, links.clientId))
-    ) {
+    if (clientId && !(await this.repository.clientExists(workspaceId, clientId))) {
       throw new AppError(400, 'Linked client was not found in this workspace.');
     }
+
+    if (caseId && !clientId) {
+      clientId = await this.repository.findCaseClientId(workspaceId, caseId);
+    }
+
+    return { caseId, clientId };
   }
 }
 
 function buildFacets(
   data: Awaited<ReturnType<DocumentRepository['facets']>>,
 ): DocumentFacetsDto {
-  const caseNames = new Map(
-    data.caseRows.map((row) => [
-      row.id,
-      row.caseNumber ? `${row.caseNumber} — ${row.title}` : row.title,
-    ]),
+  const caseCountMap = new Map(
+    data.caseCounts
+      .filter((row) => row.caseId)
+      .map((row) => [row.caseId as string, row._count._all]),
   );
-  const clientNames = new Map(data.clientRows.map((row) => [row.id, row.name]));
+  const clientCountMap = new Map(
+    data.clientCounts
+      .filter((row) => row.clientId)
+      .map((row) => [row.clientId as string, row._count._all]),
+  );
 
   return {
     categories: data.categories.map((row) => ({
@@ -230,20 +262,17 @@ function buildFacets(
       label: categoryLabel(row.category),
       count: row._count._all,
     })),
-    cases: data.cases
-      .filter((row) => row.caseId)
-      .map((row) => ({
-        id: row.caseId as string,
-        label: caseNames.get(row.caseId as string) ?? 'Unknown case',
-        count: row._count._all,
-      })),
-    clients: data.clients
-      .filter((row) => row.clientId)
-      .map((row) => ({
-        id: row.clientId as string,
-        label: clientNames.get(row.clientId as string) ?? 'Unknown client',
-        count: row._count._all,
-      })),
+    cases: data.caseRows.map((row) => ({
+      id: row.id,
+      label: row.caseNumber ? `${row.caseNumber} — ${row.title}` : row.title,
+      count: caseCountMap.get(row.id) ?? 0,
+      clientId: row.clientId,
+    })),
+    clients: data.clientRows.map((row) => ({
+      id: row.id,
+      label: row.name,
+      count: clientCountMap.get(row.id) ?? 0,
+    })),
   };
 }
 

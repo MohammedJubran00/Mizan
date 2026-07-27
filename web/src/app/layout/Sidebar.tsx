@@ -158,7 +158,7 @@ export function Sidebar() {
     <>
       <aside
         className={cn(
-          'sticky top-0 hidden h-screen shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:block print:hidden',
+          'hidden h-dvh shrink-0 border-r border-sidebar-border bg-sidebar transition-[width] duration-200 lg:block print:hidden',
           collapsed ? 'w-[72px]' : 'w-[260px]',
         )}
       >

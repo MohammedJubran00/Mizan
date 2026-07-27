@@ -43,6 +43,7 @@ export function ClientFilters({
 
       <Select
         aria-label="Filter by status"
+        fullWidth={false}
         className="h-9 w-auto min-w-40 bg-white pl-3 pr-9"
         options={statusOptions}
         value={status}

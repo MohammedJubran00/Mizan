@@ -10,6 +10,7 @@ import {
 import type {
   CaseDetails,
   CaseListItem,
+  CaseNote,
   CasePayload,
   CaseStatus,
   Hearing,
@@ -106,6 +107,7 @@ interface CaseMutationCallbacks {
   onUpdated?: (updated: CaseDetails | null) => void
   onDeleted?: () => void
   onStatusChanged?: (updated: CaseDetails | null) => void
+  onNoteCreated?: (note: CaseNote) => void
 }
 
 export function useCaseMutations({
@@ -113,6 +115,7 @@ export function useCaseMutations({
   onUpdated,
   onDeleted,
   onStatusChanged,
+  onNoteCreated,
 }: CaseMutationCallbacks = {}) {
   const queryClient = useQueryClient()
 
@@ -184,15 +187,38 @@ export function useCaseMutations({
     onError: (error) => toast.error('Could not delete cases', describeError(error)),
   })
 
+  const createNote = useMutation({
+    mutationFn: ({
+      caseId,
+      title,
+      body,
+    }: {
+      caseId: string
+      title: string
+      body: string
+    }) => caseService.createNote(caseId, { title, body }),
+    onSuccess: async (note, variables) => {
+      await queryClient.invalidateQueries({
+        queryKey: caseKeys.detail(variables.caseId),
+      })
+      await invalidateAll()
+      toast.success('Note added', 'Your note was saved to this matter.')
+      onNoteCreated?.(note)
+    },
+    onError: (error) => toast.error('Could not add note', describeError(error)),
+  })
+
   return {
     createCase,
     updateCase,
     updateStatus,
     deleteCase,
     deleteCases,
+    createNote,
     isCreating: createCase.isPending,
     isUpdating: updateCase.isPending || updateStatus.isPending,
     isDeleting: deleteCase.isPending || deleteCases.isPending,
+    isCreatingNote: createNote.isPending,
   }
 }
 

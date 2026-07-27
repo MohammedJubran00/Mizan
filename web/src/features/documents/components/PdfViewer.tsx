@@ -60,8 +60,8 @@ export function PdfViewer({
   const message = error ?? renderError
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-2.5">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-white shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle bg-surface-muted/40 px-4 py-2.5">
         <div className="flex items-center gap-1">
           <button
             type="button"

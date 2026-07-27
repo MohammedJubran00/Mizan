@@ -14,30 +14,52 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   hint?: string
   options: SelectOption[]
   placeholder?: string
+  /**
+   * When false, the control sizes to its content so it can sit inline in
+   * toolbars. Defaults to true for form layouts.
+   */
+  fullWidth?: boolean
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(
-  { label, error, hint, options, placeholder, className, id, required, ...props },
+  {
+    label,
+    error,
+    hint,
+    options,
+    placeholder,
+    className,
+    id,
+    required,
+    fullWidth = true,
+    ...props
+  },
   ref,
 ) {
   const selectId = id ?? props.name
 
   return (
-    <label className="flex w-full flex-col gap-1.5">
+    <label
+      className={cn(
+        'flex flex-col gap-1.5',
+        fullWidth ? 'w-full' : 'w-auto shrink-0',
+      )}
+    >
       {label ? (
         <span className="text-sm font-medium text-text">
           {label}
           {required ? <span className="ml-0.5 text-danger">*</span> : null}
         </span>
       ) : null}
-      <span className="relative">
+      <span className={cn('relative', fullWidth ? 'block w-full' : 'block w-auto')}>
         <select
           ref={ref}
           id={selectId}
           required={required}
           aria-invalid={error ? true : undefined}
           className={cn(
-            'h-11 w-full appearance-none rounded-lg border bg-[#f3f4f6] pl-3.5 pr-10 text-sm text-text outline-none transition',
+            'h-11 appearance-none rounded-lg border bg-[#f3f4f6] pl-3.5 pr-10 text-sm text-text outline-none transition',
+            fullWidth ? 'w-full' : 'w-auto min-w-[10rem]',
             'focus:border-blue focus:bg-white focus:ring-4 focus:ring-blue/15',
             error
               ? 'border-danger focus:border-danger focus:ring-danger/15'

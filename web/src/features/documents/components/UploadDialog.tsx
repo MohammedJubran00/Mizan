@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { FileUp, X } from 'lucide-react'
 
 import {
@@ -51,6 +51,18 @@ export function UploadDialog({
   const [clientId, setClientId] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    setFile(null)
+    setTitle('')
+    setDescription('')
+    setCategory('OTHER')
+    setCaseId('')
+    setClientId('')
+    setLocalError(null)
+    setDragging(false)
+  }, [open])
 
   if (!open) return null
 
@@ -215,9 +227,19 @@ export function UploadDialog({
               <span className="text-sm font-medium text-text">Case</span>
               <select
                 value={caseId}
-                onChange={(event) => setCaseId(event.target.value)}
+                onChange={(event) => {
+                  const nextCaseId = event.target.value
+                  setCaseId(nextCaseId)
+                  const linkedClientId = facets?.cases.find(
+                    (item) => item.id === nextCaseId,
+                  )?.clientId
+                  if (linkedClientId) {
+                    setClientId(linkedClientId)
+                  } else if (!nextCaseId) {
+                    // Clearing the case does not force-clear a manually chosen client.
+                  }
+                }}
                 className={selectClass}
-                disabled={!facets?.cases.length}
               >
                 <option value="">Unlinked</option>
                 {facets?.cases.map((item) => (
@@ -234,7 +256,6 @@ export function UploadDialog({
                 value={clientId}
                 onChange={(event) => setClientId(event.target.value)}
                 className={selectClass}
-                disabled={!facets?.clients.length}
               >
                 <option value="">Unlinked</option>
                 {facets?.clients.map((item) => (

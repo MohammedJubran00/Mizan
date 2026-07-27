@@ -19,6 +19,7 @@ export const endpoints = {
     stats: '/api/cases/stats',
     byId: (id: string) => `/api/cases/${id}`,
     status: (id: string) => `/api/cases/${id}/status`,
+    notes: (id: string) => `/api/cases/${id}/notes`,
     bulk: '/api/cases/bulk',
   },
   hearings: {

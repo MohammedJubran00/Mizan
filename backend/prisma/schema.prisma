@@ -224,6 +224,7 @@ model User {
   invoicesAsBillingLawyer Invoice[]      @relation("InvoiceBillingLawyer")
   uploadedDocuments   Document[]          @relation("DocumentUploader")
   caseMembers        CaseMember[]
+  caseNotes           CaseNote[]          @relation("CaseNoteAuthor")
 
   @@map("users")
 }
@@ -252,6 +253,7 @@ model Workspace {
   billableHourEntries BillableHourEntry[]
   documents           Document[]
   caseMembers         CaseMember[]
+  caseNotes           CaseNote[]
 
   @@map("workspaces")
 }
@@ -356,6 +358,7 @@ model Case {
   manualRevenues      ManualRevenue[]
   documents           Document[]
   members             CaseMember[]
+  notes               CaseNote[]
 
   @@index([workspaceId])
   @@index([workspaceId, status])
@@ -365,6 +368,27 @@ model Case {
   @@index([clientId])
   @@index([assignedToUserId])
   @@map("cases")
+}
+
+model CaseNote {
+  id          String   @id @default(uuid())
+  workspaceId String
+  caseId      String
+  authorId    String?
+  title       String?
+  body        String
+  shared      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  case      Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author    User?     @relation("CaseNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@index([caseId, createdAt])
+  @@index([authorId])
+  @@map("case_notes")
 }
 
 model CaseMember {

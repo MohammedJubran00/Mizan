@@ -35,6 +35,8 @@ export interface DocumentFacetOptionDto {
   id: string;
   label: string;
   count: number;
+  /** Present on case facets so upload can auto-link the case's client. */
+  clientId?: string | null;
 }
 
 /** Options for the desktop filter bar, derived from the workspace's documents. */

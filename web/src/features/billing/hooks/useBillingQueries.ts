@@ -7,6 +7,7 @@ import {
   type InvoiceListParams,
   type PaymentListParams,
 } from '../api/billingService'
+import { clientKeys } from '../../clients/hooks/useClientQueries'
 import type {
   InvoiceDetails,
   InvoicePayload,
@@ -190,6 +191,13 @@ export function useBillingMutations({
     mutationFn: (payload: InvoicePayload) => billingService.createInvoice(payload),
     onSuccess: async (invoice, payload) => {
       await invalidateAll()
+      // Keep the client profile in sync after creating an invoice.
+      if (invoice?.client?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: clientKeys.detail(invoice.client.id),
+        })
+      }
+      await queryClient.invalidateQueries({ queryKey: clientKeys.all })
       toast.success(
         payload.status === 'DRAFT' ? 'Draft saved' : 'Invoice created',
         'The invoice has been saved.',
@@ -213,6 +221,12 @@ export function useBillingMutations({
         queryKey: billingKeys.detail(variables.id),
       })
       await invalidateAll()
+      if (invoice?.client?.id) {
+        await queryClient.invalidateQueries({
+          queryKey: clientKeys.detail(invoice.client.id),
+        })
+      }
+      await queryClient.invalidateQueries({ queryKey: clientKeys.all })
       toast.success('Invoice updated', 'Your changes have been saved.')
       onUpdated?.(invoice)
     },

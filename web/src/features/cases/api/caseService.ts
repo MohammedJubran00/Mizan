@@ -94,18 +94,27 @@ function normalizeCaseDetails(raw: Partial<CaseDetails> & { id: string }): CaseD
 export const caseService = {
   async getCases(params: CaseListParams): Promise<CaseListResponse> {
     try {
-      const { data } = await apiClient.get<CaseListResponse>(endpoints.cases.root, {
+      const { data } = await apiClient.get<{
+        success?: boolean
+        items: CaseListResponse['items']
+        pagination: CaseListResponse['pagination']
+      }>(endpoints.cases.root, {
         params: {
           search: params.search || undefined,
           status: params.status !== 'ALL' ? params.status : undefined,
-          practiceArea: params.practiceArea !== 'ALL' ? params.practiceArea : undefined,
+          practiceArea:
+            params.practiceArea !== 'ALL' ? params.practiceArea : undefined,
+          priority: params.priority !== 'ALL' ? params.priority : undefined,
           sortBy: params.sortBy,
           sortDir: params.sortDir,
           page: params.page,
           pageSize: params.pageSize,
         },
       })
-      return data
+      return {
+        items: data.items ?? [],
+        pagination: data.pagination,
+      }
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Unable to load cases.'))
     }

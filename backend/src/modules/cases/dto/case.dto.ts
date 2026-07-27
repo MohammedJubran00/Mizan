@@ -33,12 +33,15 @@ export const updateCaseStatusSchema = z.object({
 export const listCasesSchema = z.object({
   search: z.string().trim().optional(),
   status: z.string().optional(),
+  priority: z.string().optional(),
   clientId: z.string().uuid().optional(),
   assignedToUserId: z.string().uuid().optional(),
   practiceArea: z.string().trim().optional(),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
-  sortBy: z.enum(['createdAt', 'title', 'status', 'openedAt']).default('createdAt'),
+  sortBy: z
+    .enum(['createdAt', 'title', 'status', 'openedAt', 'caseNumber', 'nextHearingAt', 'priority'])
+    .default('createdAt'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
 

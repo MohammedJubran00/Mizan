@@ -66,6 +66,9 @@ export class CaseRepository {
   async findMany(workspaceId: string, query: ListCasesQuery): Promise<{ rows: CaseRow[]; total: number }> {
     const where: Prisma.CaseWhereInput = { workspaceId };
     if (query.status && query.status !== 'ALL') where.status = query.status as CaseStatus;
+    if (query.priority && query.priority !== 'ALL') {
+      where.priority = query.priority as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+    }
     if (query.clientId) where.clientId = query.clientId;
     if (query.assignedToUserId) where.assignedToUserId = query.assignedToUserId;
     if (query.practiceArea) where.practiceArea = { contains: query.practiceArea, mode: 'insensitive' };
@@ -73,15 +76,69 @@ export class CaseRepository {
       where.OR = [
         { title: { contains: query.search, mode: 'insensitive' } },
         { caseNumber: { contains: query.search, mode: 'insensitive' } },
+        { client: { name: { contains: query.search, mode: 'insensitive' } } },
       ];
     }
+
+    const skip = (query.page - 1) * query.pageSize;
+    const take = query.pageSize;
+
+    // nextHearingAt is derived from related hearings — sort then page in app code.
+    if (query.sortBy === 'nextHearingAt') {
+      const candidates = await this.prisma.case.findMany({
+        where,
+        select: {
+          id: true,
+          hearings: {
+            where: {
+              status: { in: ['SCHEDULED', 'UPCOMING', 'RESCHEDULED'] },
+              scheduledAt: { gte: new Date() },
+            },
+            orderBy: { scheduledAt: 'asc' },
+            take: 1,
+            select: { scheduledAt: true },
+          },
+        },
+      });
+
+      candidates.sort((a, b) => {
+        const aTime = a.hearings[0]?.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        const bTime = b.hearings[0]?.scheduledAt?.getTime() ?? Number.POSITIVE_INFINITY;
+        return query.sortDir === 'asc' ? aTime - bTime : bTime - aTime;
+      });
+
+      const total = candidates.length;
+      const pageIds = candidates.slice(skip, skip + take).map((c) => c.id);
+      if (pageIds.length === 0) return { rows: [], total };
+
+      const rows = await this.prisma.case.findMany({
+        where: { id: { in: pageIds } },
+        include: caseInclude,
+      });
+      const byId = new Map(rows.map((row) => [row.id, row]));
+      return {
+        rows: pageIds.map((id) => byId.get(id)).filter((row): row is CaseRow => Boolean(row)),
+        total,
+      };
+    }
+
+    const orderByField =
+      query.sortBy === 'caseNumber' ||
+      query.sortBy === 'priority' ||
+      query.sortBy === 'createdAt' ||
+      query.sortBy === 'title' ||
+      query.sortBy === 'status' ||
+      query.sortBy === 'openedAt'
+        ? query.sortBy
+        : 'createdAt';
+
     const [rows, total] = await Promise.all([
       this.prisma.case.findMany({
         where,
         include: caseInclude,
-        orderBy: { [query.sortBy]: query.sortDir },
-        skip: (query.page - 1) * query.pageSize,
-        take: query.pageSize,
+        orderBy: { [orderByField]: query.sortDir },
+        skip,
+        take,
       }),
       this.prisma.case.count({ where }),
     ]);

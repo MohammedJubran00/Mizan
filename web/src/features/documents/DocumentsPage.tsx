@@ -11,6 +11,7 @@ import {
   uploadDocument,
 } from '@/features/documents/api'
 import { DocumentDetails } from '@/features/documents/components/DocumentDetails'
+import { DeleteDocumentDialog } from '@/features/documents/components/DeleteDocumentDialog'
 import { DocumentFilters } from '@/features/documents/components/DocumentFilters'
 import { DocumentTable } from '@/features/documents/components/DocumentTable'
 import { PdfViewer } from '@/features/documents/components/PdfViewer'
@@ -44,6 +45,7 @@ export function DocumentsPage() {
   const [page, setPage] = useState(1)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -124,6 +126,7 @@ export function DocumentsPage() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteDocument(id),
     onSuccess: async (_result, id) => {
+      setPendingDelete(null)
       queryClient.removeQueries({ queryKey: ['document-file', id] })
       if (selectedId === id) setSelectedId(null)
       await queryClient.invalidateQueries({ queryKey: ['documents'] })
@@ -242,15 +245,7 @@ export function DocumentsPage() {
               loading={listQuery.isLoading}
               selectedId={selectedId}
               onSelect={(item: DocumentItem) => setSelectedId(item.id)}
-              onDelete={(item) => {
-                if (
-                  window.confirm(
-                    `Delete "${item.title}"? This removes the file permanently.`,
-                  )
-                ) {
-                  deleteMutation.mutate(item.id)
-                }
-              }}
+              onDelete={(item) => setPendingDelete(item)}
               sortBy={sortBy}
               sortDir={sortDir}
               onSort={handleSort}
@@ -324,6 +319,16 @@ export function DocumentsPage() {
         progress={uploadProgress}
         error={uploadError}
         onSubmit={(payload) => uploadMutation.mutate(payload)}
+      />
+
+      <DeleteDocumentDialog
+        open={Boolean(pendingDelete)}
+        documentTitle={pendingDelete?.title ?? ''}
+        deleting={deleteMutation.isPending}
+        onConfirm={() => {
+          if (pendingDelete) deleteMutation.mutate(pendingDelete.id)
+        }}
+        onCancel={() => setPendingDelete(null)}
       />
     </>
   )

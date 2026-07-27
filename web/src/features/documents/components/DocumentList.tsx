@@ -13,6 +13,7 @@ import {
   type DocumentSortField,
   type SortDirection,
 } from '@/features/documents/types'
+import { Button } from '@/shared/components/Button'
 import { Skeleton } from '@/shared/components/Skeleton'
 import { cn, formatBytes, formatShortDate } from '@/shared/lib/utils'
 
@@ -25,6 +26,12 @@ interface DocumentListProps {
   sortBy: DocumentSortField
   sortDir: SortDirection
   onSort: (field: DocumentSortField) => void
+  page: number
+  totalPages: number
+  total: number
+  hasMore: boolean
+  onPreviousPage: () => void
+  onNextPage: () => void
 }
 
 const SORT_OPTIONS: Array<{ field: DocumentSortField; label: string }> = [
@@ -43,14 +50,22 @@ export function DocumentList({
   sortBy,
   sortDir,
   onSort,
+  page,
+  totalPages,
+  total,
+  hasMore,
+  onPreviousPage,
+  onNextPage,
 }: DocumentListProps) {
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-white shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border-subtle px-4 py-3">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border-subtle bg-white shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
+      <div className="shrink-0 space-y-3 border-b border-border-subtle px-4 py-3.5">
         <div>
           <h2 className="text-sm font-semibold text-navy">Library</h2>
           <p className="text-xs text-text-muted">
-            Select a file to preview, edit, or delete
+            {total === 0
+              ? 'No documents yet'
+              : `${total} document${total === 1 ? '' : 's'} · 10 per page`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-1">
@@ -65,7 +80,7 @@ export function DocumentList({
                   'inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-xs font-medium transition',
                   active
                     ? 'bg-navy text-white'
-                    : 'bg-surface-muted text-text-secondary hover:bg-surface-muted/80 hover:text-navy',
+                    : 'bg-surface-muted text-text-secondary hover:bg-white hover:text-navy',
                 )}
               >
                 {option.label}
@@ -85,7 +100,7 @@ export function DocumentList({
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {loading ? (
           <div className="space-y-2 p-1">
-            {Array.from({ length: 5 }).map((_, index) => (
+            {Array.from({ length: 6 }).map((_, index) => (
               <div
                 key={index}
                 className="rounded-xl border border-border-subtle p-3"
@@ -126,7 +141,7 @@ export function DocumentList({
                       }
                     }}
                     className={cn(
-                      'group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition',
+                      'group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-left transition duration-150',
                       isSelected
                         ? 'border-blue/30 bg-blue-soft/70 shadow-[inset_3px_0_0_0_var(--color-blue)]'
                         : 'border-transparent hover:border-border-subtle hover:bg-surface-muted/70',
@@ -134,7 +149,7 @@ export function DocumentList({
                   >
                     <span
                       className={cn(
-                        'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl',
+                        'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl transition',
                         isSelected
                           ? 'bg-blue text-white'
                           : 'bg-surface-muted text-text-muted group-hover:text-blue',
@@ -207,6 +222,32 @@ export function DocumentList({
           </ul>
         )}
       </div>
+
+      {total > 0 ? (
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border-subtle px-3 py-2.5">
+          <span className="text-xs text-text-muted">
+            Page {page} of {Math.max(totalPages, 1)}
+          </span>
+          <div className="flex gap-1.5">
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={page <= 1 || loading}
+              onClick={onPreviousPage}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={!hasMore || loading}
+              onClick={onNextPage}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

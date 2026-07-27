@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  CalendarDays,
   FileStack,
   HardDrive,
   Link2Off,
   Upload,
-  CalendarDays,
 } from 'lucide-react'
 
 import { TopBar } from '@/app/layout/TopBar'
@@ -18,6 +18,7 @@ import {
 } from '@/features/documents/api'
 import { DocumentDetails } from '@/features/documents/components/DocumentDetails'
 import { DeleteDocumentDialog } from '@/features/documents/components/DeleteDocumentDialog'
+import { DocumentEmptyState } from '@/features/documents/components/DocumentEmptyState'
 import { DocumentFilters } from '@/features/documents/components/DocumentFilters'
 import { DocumentList } from '@/features/documents/components/DocumentList'
 import { PdfViewer } from '@/features/documents/components/PdfViewer'
@@ -36,7 +37,7 @@ import { formatBytes, formatCount } from '@/shared/lib/utils'
 
 /** Mirrors the API's MAX_UPLOAD_MB so the dialog can reject oversized files early. */
 const MAX_UPLOAD_MB = Number(import.meta.env.VITE_MAX_UPLOAD_MB ?? 25)
-const PAGE_SIZE = 25
+const PAGE_SIZE = 10
 
 /** Stable reference so selection effects don't re-run on every render. */
 const NO_ITEMS: DocumentItem[] = []
@@ -63,6 +64,7 @@ export function DocumentsPage() {
 
   useEffect(() => {
     setPage(1)
+    setSelectedId(null)
   }, [debouncedSearch, category, caseId, clientId, sortBy, sortDir])
 
   const listQuery = useQuery({
@@ -84,22 +86,22 @@ export function DocumentsPage() {
   })
 
   const items = listQuery.data?.items ?? NO_ITEMS
+  const pagination = listQuery.data?.pagination
+  const summary = listQuery.data?.summary
 
   const selected = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
     [items, selectedId],
   )
 
-  // Keep a document selected as the user filters or paginates.
+  // Preserve selection only while the document remains on the current page.
   useEffect(() => {
-    if (!items.length) {
-      setSelectedId(null)
-      return
-    }
+    if (!selectedId) return
+    if (listQuery.isFetching) return
     if (!items.some((item) => item.id === selectedId)) {
-      setSelectedId(items[0].id)
+      setSelectedId(null)
     }
-  }, [items, selectedId])
+  }, [items, selectedId, listQuery.isFetching])
 
   const previewQuery = useQuery({
     queryKey: ['document-file', selectedId],
@@ -116,12 +118,13 @@ export function DocumentsPage() {
       setUploadOpen(false)
       setUploadProgress(0)
       setUploadError(null)
+      setPage(1)
+      setSelectedId(document.id)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['documents'] }),
         queryClient.invalidateQueries({ queryKey: caseKeys.all }),
         queryClient.invalidateQueries({ queryKey: clientKeys.all }),
       ])
-      setSelectedId(document.id)
     },
     onError: (error: Error) => setUploadError(error.message),
   })
@@ -198,8 +201,6 @@ export function DocumentsPage() {
   }
 
   const hasActiveFilters = Boolean(search || category || caseId || clientId)
-  const summary = listQuery.data?.summary
-  const pagination = listQuery.data?.pagination
 
   return (
     <>
@@ -220,14 +221,9 @@ export function DocumentsPage() {
         }
       />
 
-      <main className="relative mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08),_transparent_60%)]"
-        />
-
+      <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
         {listQuery.isError ? (
-          <div className="relative rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
+          <div className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
             {listQuery.error instanceof Error
               ? listQuery.error.message
               : 'Unable to load documents.'}
@@ -235,7 +231,7 @@ export function DocumentsPage() {
         ) : null}
 
         {actionError ? (
-          <div className="relative flex items-start justify-between gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
+          <div className="flex items-start justify-between gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
             <span>{actionError}</span>
             <button
               type="button"
@@ -248,7 +244,7 @@ export function DocumentsPage() {
         ) : null}
 
         {summary ? (
-          <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryTile
               icon={FileStack}
               label="Documents"
@@ -272,24 +268,22 @@ export function DocumentsPage() {
           </div>
         ) : null}
 
-        <div className="relative">
-          <DocumentFilters
-            search={search}
-            onSearchChange={setSearch}
-            category={category}
-            onCategoryChange={setCategory}
-            caseId={caseId}
-            onCaseChange={setCaseId}
-            clientId={clientId}
-            onClientChange={setClientId}
-            facets={listQuery.data?.facets}
-            onReset={resetFilters}
-            hasActiveFilters={hasActiveFilters}
-          />
-        </div>
+        <DocumentFilters
+          search={search}
+          onSearchChange={setSearch}
+          category={category}
+          onCategoryChange={setCategory}
+          caseId={caseId}
+          onCaseChange={setCaseId}
+          clientId={clientId}
+          onClientChange={setClientId}
+          facets={listQuery.data?.facets}
+          onReset={resetFilters}
+          hasActiveFilters={hasActiveFilters}
+        />
 
-        <div className="relative grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)]">
-          <div className="flex min-h-[28rem] min-w-0 flex-col gap-3 xl:h-[calc(100vh-14rem)]">
+        <div className="grid min-h-[calc(100dvh-17rem)] flex-1 gap-4 xl:grid-cols-[minmax(19rem,22.5rem)_minmax(0,1fr)]">
+          <div className="min-h-[28rem] xl:min-h-0">
             <DocumentList
               items={items}
               loading={listQuery.isLoading}
@@ -299,63 +293,47 @@ export function DocumentsPage() {
               sortBy={sortBy}
               sortDir={sortDir}
               onSort={handleSort}
+              page={pagination?.page ?? page}
+              totalPages={pagination?.totalPages ?? 0}
+              total={pagination?.total ?? 0}
+              hasMore={pagination?.hasMore ?? false}
+              onPreviousPage={() => setPage((value) => Math.max(1, value - 1))}
+              onNextPage={() => setPage((value) => value + 1)}
             />
-
-            {pagination && pagination.totalPages > 1 ? (
-              <div className="flex items-center justify-between rounded-xl border border-border-subtle bg-white px-4 py-2.5 text-sm">
-                <span className="text-xs text-text-muted">
-                  Page {pagination.page} of {pagination.totalPages} ·{' '}
-                  {pagination.total} total
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={pagination.page <= 1}
-                    onClick={() => setPage((value) => Math.max(1, value - 1))}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={!pagination.hasMore}
-                    onClick={() => setPage((value) => value + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </div>
-            ) : null}
           </div>
 
-          <div className="flex min-w-0 flex-col gap-4 xl:h-[calc(100vh-14rem)]">
+          <div className="flex min-w-0 flex-col gap-4">
             {selected ? (
-              <DocumentDetails
-                document={selected}
-                saving={updateMutation.isPending}
-                onSave={(payload) =>
-                  updateMutation.mutate({ id: selected.id, payload })
-                }
-                onDelete={() => setPendingDelete(selected)}
-              />
-            ) : null}
-
-            <div className="min-h-[24rem] flex-1">
-              <PdfViewer
-                blob={previewQuery.data ?? null}
-                loading={previewQuery.isLoading}
-                error={
-                  previewQuery.isError
-                    ? previewQuery.error instanceof Error
-                      ? previewQuery.error.message
-                      : 'Unable to preview this document.'
-                    : null
-                }
-                onDownload={() => void handleDownload()}
-                downloading={downloading}
-              />
-            </div>
+              <>
+                <DocumentDetails
+                  document={selected}
+                  saving={updateMutation.isPending}
+                  downloading={downloading}
+                  onSave={(payload) =>
+                    updateMutation.mutate({ id: selected.id, payload })
+                  }
+                  onDelete={() => setPendingDelete(selected)}
+                  onDownload={() => void handleDownload()}
+                />
+                <div className="min-h-[24rem] flex-1">
+                  <PdfViewer
+                    blob={previewQuery.data ?? null}
+                    loading={previewQuery.isLoading}
+                    error={
+                      previewQuery.isError
+                        ? previewQuery.error instanceof Error
+                          ? previewQuery.error.message
+                          : 'Unable to preview this document.'
+                        : null
+                    }
+                    onDownload={() => void handleDownload()}
+                    downloading={downloading}
+                  />
+                </div>
+              </>
+            ) : (
+              <DocumentEmptyState />
+            )}
           </div>
         </div>
       </main>
@@ -397,7 +375,7 @@ function SummaryTile({
   value: string
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-white/90 px-4 py-3 shadow-[0_1px_2px_rgba(26,46,90,0.04)] backdrop-blur-sm">
+    <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-white px-4 py-3 shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
       <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-soft text-blue">
         <Icon className="size-4" />
       </span>

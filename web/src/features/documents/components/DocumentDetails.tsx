@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   Briefcase,
   Check,
+  Download,
   Pencil,
   Trash2,
   UserRound,
@@ -20,19 +21,23 @@ import { formatBytes, formatShortDate } from '@/shared/lib/utils'
 interface DocumentDetailsProps {
   document: DocumentItem
   saving: boolean
+  downloading?: boolean
   onSave: (payload: {
     title: string
     description: string | null
     category: DocumentCategory
   }) => void
   onDelete: () => void
+  onDownload: () => void
 }
 
 export function DocumentDetails({
   document,
   saving,
+  downloading,
   onSave,
   onDelete,
+  onDownload,
 }: DocumentDetailsProps) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(document.title)
@@ -53,7 +58,7 @@ export function DocumentDetails({
     : 'Unlinked'
 
   return (
-    <section className="rounded-2xl border border-border-subtle bg-white p-4 shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
+    <section className="shrink-0 rounded-2xl border border-border-subtle bg-white p-4 shadow-[0_1px_2px_rgba(26,46,90,0.04)] transition-opacity duration-200">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           {editing ? (
@@ -99,14 +104,19 @@ export function DocumentDetails({
             </button>
           </div>
         ) : (
-          <div className="flex shrink-0 items-center gap-1.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+            <Button size="sm" variant="secondary" onClick={() => setEditing(true)}>
+              <Pencil className="size-3.5" />
+              Edit
+            </Button>
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => setEditing(true)}
+              onClick={onDownload}
+              loading={downloading}
             >
-              <Pencil className="size-3.5" />
-              Edit
+              <Download className="size-3.5" />
+              Download
             </Button>
             <Button size="sm" variant="danger" onClick={onDelete}>
               <Trash2 className="size-3.5" />
@@ -158,11 +168,7 @@ export function DocumentDetails({
             label="Uploaded"
             value={formatShortDate(document.createdAt)}
           />
-          <MetaChip
-            label="Case"
-            value={caseLabel}
-            icon={Briefcase}
-          />
+          <MetaChip label="Case" value={caseLabel} icon={Briefcase} />
           <MetaChip
             label="Client"
             value={document.clientName ?? 'Unlinked'}
@@ -174,7 +180,7 @@ export function DocumentDetails({
           />
           <MetaChip label="Size" value={formatBytes(document.sizeBytes)} />
           {document.description ? (
-            <div className="sm:col-span-2 rounded-xl bg-surface-muted/70 px-3 py-2.5">
+            <div className="rounded-xl bg-surface-muted/70 px-3 py-2.5 sm:col-span-2">
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
                 Description
               </p>

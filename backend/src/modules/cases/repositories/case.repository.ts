@@ -56,6 +56,18 @@ const caseInclude = {
     orderBy: { issuedAt: 'desc' as const },
     take: 50,
   },
+  notes: {
+    select: {
+      id: true,
+      title: true,
+      body: true,
+      shared: true,
+      createdAt: true,
+      author: { select: { id: true, fullName: true } },
+    },
+    orderBy: { createdAt: 'desc' as const },
+    take: 100,
+  },
 } satisfies Prisma.CaseInclude;
 
 export type CaseRow = Prisma.CaseGetPayload<{ include: typeof caseInclude }>;
@@ -185,6 +197,37 @@ export class CaseRepository {
   async bulkDelete(workspaceId: string, ids: string[]): Promise<number> {
     const result = await this.prisma.case.deleteMany({ where: { id: { in: ids }, workspaceId } });
     return result.count;
+  }
+
+  async createNote(
+    workspaceId: string,
+    caseId: string,
+    data: { title?: string | null; body: string; authorId?: string | null; shared?: boolean },
+  ) {
+    const existing = await this.prisma.case.findFirst({
+      where: { id: caseId, workspaceId },
+      select: { id: true },
+    });
+    if (!existing) return null;
+
+    return this.prisma.caseNote.create({
+      data: {
+        workspaceId,
+        caseId,
+        title: data.title ?? null,
+        body: data.body,
+        authorId: data.authorId ?? null,
+        shared: data.shared ?? false,
+      },
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        shared: true,
+        createdAt: true,
+        author: { select: { id: true, fullName: true } },
+      },
+    });
   }
 
   async syncMembers(workspaceId: string, caseId: string, userIds: string[]): Promise<void> {

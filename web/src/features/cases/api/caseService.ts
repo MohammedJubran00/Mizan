@@ -10,6 +10,7 @@ import type {
   CaseSortField,
   CaseStatsSummary,
   CaseStatus,
+  CaseNote,
   Hearing,
   HearingListResponse,
   HearingPayload,
@@ -230,6 +231,24 @@ export const caseService = {
       await apiClient.delete(endpoints.cases.bulk, { data: { ids } })
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Unable to delete cases.'))
+    }
+  },
+
+  async createNote(
+    caseId: string,
+    payload: { title: string; body: string },
+  ): Promise<CaseNote> {
+    try {
+      const { data } = await apiClient.post<{ success: boolean; data: CaseNote }>(
+        endpoints.cases.notes(caseId),
+        {
+          title: payload.title.trim() || null,
+          body: payload.body.trim(),
+        },
+      )
+      return data.data
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to add note.'))
     }
   },
 

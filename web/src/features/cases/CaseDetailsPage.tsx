@@ -60,10 +60,11 @@ export function CaseDetailsPage() {
   const [statusOpen, setStatusOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
-  const { updateStatus, deleteCase, isUpdating, isDeleting } = useCaseMutations({
-    onStatusChanged: () => setStatusOpen(false),
-    onDeleted: () => navigate('/cases', { replace: true }),
-  })
+  const { updateStatus, deleteCase, createNote, isUpdating, isDeleting, isCreatingNote } =
+    useCaseMutations({
+      onStatusChanged: () => setStatusOpen(false),
+      onDeleted: () => navigate('/cases', { replace: true }),
+    })
 
   const activeTab: TabId = isTabId(searchParams.get('tab'))
     ? (searchParams.get('tab') as TabId)
@@ -277,7 +278,17 @@ export function CaseDetailsPage() {
             </TabPanel>
 
             <TabPanel idPrefix="case" id="notes" active={activeTab === 'notes'}>
-              <NotesTab notes={caseDetails.notes} />
+              <NotesTab
+                notes={caseDetails.notes}
+                saving={isCreatingNote}
+                onAddNote={(payload) =>
+                  createNote.mutateAsync({
+                    caseId: caseDetails.id,
+                    title: payload.title,
+                    body: payload.body,
+                  })
+                }
+              />
             </TabPanel>
 
             <TabPanel idPrefix="case" id="timeline" active={activeTab === 'timeline'}>

@@ -30,6 +30,12 @@ export const updateCaseStatusSchema = z.object({
   status: CaseStatusEnum,
 });
 
+export const createCaseNoteSchema = z.object({
+  title: z.string().trim().max(200).optional().nullable(),
+  body: z.string().trim().min(1, 'Description is required.').max(10000),
+  shared: z.boolean().optional(),
+});
+
 export const listCasesSchema = z.object({
   search: z.string().trim().optional(),
   status: z.string().optional(),
@@ -47,4 +53,5 @@ export const listCasesSchema = z.object({
 
 export type CreateCaseInput = z.infer<typeof createCaseSchema>;
 export type UpdateCaseInput = z.infer<typeof updateCaseSchema>;
+export type CreateCaseNoteInput = z.infer<typeof createCaseNoteSchema>;
 export type ListCasesQuery = z.infer<typeof listCasesSchema>;

@@ -36,7 +36,8 @@ function emptyPagination(page: number, pageSize: number) {
 }
 
 /**
- * Placeholder data access layer for the reports module.
+ * TODO: No Report model in Prisma — reports CRUD/analytics are unimplemented.
+ * Returns empty results so the Reports UI shows an empty state (not fake data).
  *
  * Every method resolves empty until `/api/reports` exists. Signatures are the
  * UI contract — swap bodies for `apiClient` + `endpoints.reports` later.

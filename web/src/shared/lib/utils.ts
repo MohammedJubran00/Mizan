@@ -5,30 +5,36 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatMoney(amount: number, currency = 'USD') {
+export function formatMoney(amount: number | null | undefined, currency = 'USD') {
+  const value = Number(amount ?? 0)
   try {
     return new Intl.NumberFormat(undefined, {
       style: 'currency',
       currency,
-      maximumFractionDigits: amount >= 1000 ? 0 : 2,
-    }).format(amount)
+      maximumFractionDigits: value >= 1000 ? 0 : 2,
+    }).format(Number.isFinite(value) ? value : 0)
   } catch {
-    return `${currency} ${amount.toLocaleString()}`
+    return `${currency} ${(Number.isFinite(value) ? value : 0).toLocaleString()}`
   }
 }
 
-export function formatPercent(value: number) {
-  if (Number.isInteger(value)) return `${value}%`
-  return `${value.toFixed(1)}%`
+export function formatPercent(value: number | null | undefined) {
+  const n = Number(value ?? 0)
+  if (!Number.isFinite(n)) return '0%'
+  if (Number.isInteger(n)) return `${n}%`
+  return `${n.toFixed(1)}%`
 }
 
-export function formatHours(hours: number) {
-  if (Number.isInteger(hours)) return `${hours}h`
-  return `${hours.toFixed(1)}h`
+export function formatHours(hours: number | null | undefined) {
+  const n = Number(hours ?? 0)
+  if (!Number.isFinite(n)) return '0h'
+  if (Number.isInteger(n)) return `${n}h`
+  return `${n.toFixed(1)}h`
 }
 
-export function formatCount(value: number) {
-  return new Intl.NumberFormat().format(Math.round(value))
+export function formatCount(value: number | null | undefined) {
+  const n = Number(value ?? 0)
+  return new Intl.NumberFormat().format(Math.round(Number.isFinite(n) ? n : 0))
 }
 
 export function formatDisplayDate(iso: string | Date) {
@@ -112,8 +118,11 @@ export function formatRelativeTime(iso: string | Date) {
   return formatter.format(Math.round(diff / 1000), 'second')
 }
 
-export function initials(name: string) {
-  return name
+export function initials(name: string | null | undefined) {
+  const value = (name ?? '').trim()
+  if (!value) return ''
+
+  return value
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)

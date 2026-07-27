@@ -3,7 +3,7 @@ import { cn, initials } from '@/shared/lib/utils'
 type AvatarSize = 'sm' | 'md' | 'lg' | 'xl'
 
 interface AvatarProps {
-  name: string
+  name?: string | null
   src?: string | null
   size?: AvatarSize
   /** Renders a small presence dot; omit for no indicator. */
@@ -25,14 +25,15 @@ export function Avatar({
   online,
   className,
 }: AvatarProps) {
-  const label = initials(name) || '—'
+  const displayName = name?.trim() || 'Unknown'
+  const label = initials(displayName) || '?'
 
   return (
     <span className={cn('relative inline-flex shrink-0', className)}>
       {src ? (
         <img
           src={src}
-          alt={name}
+          alt={displayName}
           className={cn(
             'rounded-full border border-border-subtle object-cover',
             sizes[size],
@@ -57,7 +58,7 @@ export function Avatar({
           )}
         />
       ) : null}
-      {!src ? <span className="sr-only">{name}</span> : null}
+      {!src ? <span className="sr-only">{displayName}</span> : null}
     </span>
   )
 }

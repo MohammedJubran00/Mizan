@@ -53,10 +53,17 @@ apiClient.interceptors.response.use(
 
 export function getErrorMessage(error: unknown, fallback = 'Something went wrong. Please try again.') {
   if (axios.isAxiosError<ApiErrorBody>(error)) {
+    const body = error.response?.data
+    const fieldErrors = body?.errors
+      ?.map((issue) => issue.message)
+      .filter(Boolean)
+      .join(' ')
+
     return (
-      error.response?.data?.message ??
-      error.response?.data?.error ??
-      error.message ??
+      fieldErrors ||
+      body?.message ||
+      body?.error ||
+      error.message ||
       fallback
     )
   }

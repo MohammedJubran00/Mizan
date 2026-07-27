@@ -169,9 +169,9 @@ export function InvoiceDetailsPage() {
 
   const tabs: TabItem[] = [
     { id: 'overview', label: 'Overview' },
-    { id: 'payments', label: 'Payments', count: invoice.payments.length },
-    { id: 'activity', label: 'Activity', count: invoice.activities.length },
-    { id: 'notes', label: 'Notes', count: invoice.notes.length },
+    { id: 'payments', label: 'Payments', count: invoice.payments?.length ?? 0 },
+    { id: 'activity', label: 'Activity', count: invoice.activities?.length ?? 0 },
+    { id: 'notes', label: 'Notes', count: invoice.notes?.length ?? 0 },
   ]
 
   const listItem: InvoiceListItem = {
@@ -232,7 +232,11 @@ export function InvoiceDetailsPage() {
               size="sm"
               variant="secondary"
               onClick={() => navigate(`/billing/invoices/${invoice.id}/edit`)}
-              disabled={invoice.status === 'VOID' || invoice.status === 'PAID'}
+              disabled={
+                invoice.status === 'CANCELLED' ||
+                invoice.status === 'VOID' ||
+                invoice.status === 'PAID'
+              }
             >
               <Pencil className="size-4" />
               Edit
@@ -249,7 +253,11 @@ export function InvoiceDetailsPage() {
               size="sm"
               variant="secondary"
               onClick={() => setVoidOpen(true)}
-              disabled={invoice.status === 'VOID' || invoice.status === 'PAID'}
+              disabled={
+                invoice.status === 'CANCELLED' ||
+                invoice.status === 'VOID' ||
+                invoice.status === 'PAID'
+              }
             >
               <Ban className="size-4" />
               Void

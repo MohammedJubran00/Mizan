@@ -20,7 +20,7 @@ function buildItems(caseDetails: CaseDetails): InfoItem[] {
     { label: 'Case title', value: caseDetails.title },
     {
       label: 'Practice area',
-      value: practiceAreaLabels[caseDetails.practiceArea],
+      value: practiceAreaLabels[caseDetails.practiceArea] ?? caseDetails.practiceArea,
     },
     { label: 'Description', value: caseDetails.description, wide: true },
     { label: 'Court', value: caseDetails.court },

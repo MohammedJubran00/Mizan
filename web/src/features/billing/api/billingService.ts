@@ -1,3 +1,5 @@
+import { apiClient, getErrorMessage } from '@/shared/api/client'
+import { endpoints } from '@/shared/api/endpoints'
 import type {
   BillingActionRequired,
   BillingCaseRef,
@@ -35,71 +37,288 @@ function emptyPagination(page: number, pageSize: number): BillingPagination {
   return { page, pageSize, total: 0, totalPages: 0, hasMore: false }
 }
 
-/**
- * Placeholder data access layer for the billing module.
- *
- * Backend invoice/payment CRUD is not exposed yet, so every method resolves with
- * an empty result. Replace bodies with `apiClient` + `endpoints.billing` calls
- * once the API lands — the signatures below are the UI contract.
- */
+function mapPerson(raw: any): BillingPersonRef | null {
+  if (!raw) return null
+  return {
+    id: raw.id,
+    fullName: raw.fullName ?? raw.name ?? 'Unknown',
+    email: raw.email ?? null,
+    subtitle: raw.subtitle ?? null,
+  }
+}
+
+/** Normalize backend invoice payload into the UI InvoiceDetails shape. */
+function normalizeInvoiceDetails(raw: any): InvoiceDetails {
+  const items = (raw.items ?? []).map((item: any, index: number) => {
+    const quantity = Number(item.quantity ?? 0)
+    const rate = Number(item.rate ?? 0)
+    const taxRate = Number(item.taxRate ?? 0)
+    const discountRate = Number(item.discountRate ?? 0)
+    const gross = quantity * rate
+    const afterDiscount = gross * (1 - discountRate / 100)
+    const amount = Number(item.amount ?? afterDiscount * (1 + taxRate / 100))
+
+    return {
+      id: item.id ?? `item-${index}`,
+      description: item.description ?? '',
+      quantity,
+      rate,
+      taxRate,
+      discountRate,
+      amount,
+    }
+  })
+
+  const subtotal = items.reduce(
+    (sum: number, item: { quantity: number; rate: number }) =>
+      sum + item.quantity * item.rate,
+    0,
+  )
+  const discountAmount = items.reduce(
+    (sum: number, item: { quantity: number; rate: number; discountRate: number }) =>
+      sum + item.quantity * item.rate * (item.discountRate / 100),
+    0,
+  )
+  const taxAmount = items.reduce(
+    (
+      sum: number,
+      item: { quantity: number; rate: number; discountRate: number; taxRate: number },
+    ) => {
+      const afterDiscount =
+        item.quantity * item.rate * (1 - item.discountRate / 100)
+      return sum + afterDiscount * (item.taxRate / 100)
+    },
+    0,
+  )
+  const total = Number(raw.amount ?? subtotal - discountAmount + taxAmount)
+  const amountPaid =
+    raw.status === 'PAID' || raw.paidAt ? total : Number(raw.amountPaid ?? 0)
+
+  const payments = Array.isArray(raw.payments)
+    ? raw.payments
+    : raw.payment
+      ? [
+          {
+            id: raw.payment.id,
+            invoiceId: raw.id,
+            invoiceNumber: raw.number,
+            client: mapPerson(raw.client),
+            amount: total,
+            currency: raw.currency ?? 'USD',
+            method: raw.payment.paymentMethod ?? 'OTHER',
+            status:
+              raw.payment.status === 'POSTED' ? 'COMPLETED' : raw.payment.status,
+            paymentDate: raw.payment.occurredAt ?? raw.paidAt ?? raw.updatedAt,
+            referenceNumber: null,
+            notes: null,
+            recordedAt: raw.payment.occurredAt ?? raw.updatedAt,
+          },
+        ]
+      : []
+
+  const status =
+    raw.status === 'CANCELLED' || raw.status === 'REFUNDED' ? 'VOID' : raw.status
+
+  return {
+    id: raw.id,
+    number: raw.number ?? raw.id?.slice?.(0, 8)?.toUpperCase?.() ?? 'INV',
+    status: status ?? 'DRAFT',
+    currency: raw.currency ?? 'USD',
+    terms: raw.terms ?? 'NET_30',
+    issueDate: raw.issueDate ?? raw.issuedAt ?? new Date().toISOString(),
+    dueDate: raw.dueDate ?? raw.dueAt ?? null,
+    client: mapPerson(raw.client),
+    relatedCase: raw.relatedCase
+      ? {
+          id: raw.relatedCase.id,
+          caseNumber: raw.relatedCase.caseNumber ?? '',
+          title: raw.relatedCase.title ?? '',
+        }
+      : raw.case
+        ? {
+            id: raw.case.id,
+            caseNumber: raw.case.caseNumber ?? '',
+            title: raw.case.title ?? '',
+          }
+        : null,
+    billingLawyer: mapPerson(raw.billingLawyer),
+    items,
+    subtotal,
+    tax: { rate: 0, amount: taxAmount },
+    discount: { rate: 0, amount: discountAmount },
+    total,
+    amountPaid,
+    balanceDue: Math.max(0, total - amountPaid),
+    paymentInstructions: raw.paymentInstructions ?? null,
+    caseSummary: raw.caseSummary ?? null,
+    timeline: raw.timeline ?? [],
+    payments,
+    activities: raw.activities ?? [],
+    notes: raw.notes ?? [],
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  }
+}
+
+function toApiInvoiceBody(payload: Partial<InvoicePayload>) {
+  const items = (payload.items ?? []).map((item, index) => ({
+    description: item.description,
+    quantity: item.quantity,
+    rate: item.rate,
+    taxRate: item.taxRate ?? 0,
+    discountRate: item.discountRate ?? 0,
+    sortOrder: index,
+  }))
+
+  const amount = items.reduce((sum, item) => {
+    const gross = item.quantity * item.rate
+    const afterDiscount = gross * (1 - item.discountRate / 100)
+    return sum + afterDiscount * (1 + item.taxRate / 100)
+  }, 0)
+
+  const stamp = new Date()
+  const number = `INV-${stamp.getFullYear()}${String(stamp.getMonth() + 1).padStart(2, '0')}${String(stamp.getDate()).padStart(2, '0')}-${String(stamp.getTime()).slice(-5)}`
+
+  return {
+    clientId: payload.clientId || null,
+    caseId: payload.caseId || null,
+    billingLawyerUserId: payload.billingLawyerId || null,
+    number,
+    amount,
+    currency: payload.currency ?? 'USD',
+    status: payload.status ?? 'DRAFT',
+    issuedAt: payload.issueDate || undefined,
+    dueAt: payload.dueDate || null,
+    terms: payload.terms || 'NET_30',
+    paymentInstructions: payload.paymentInstructions || null,
+    caseSummary: payload.caseSummary || null,
+    items,
+  }
+}
+
 export const billingService = {
   async getInvoices(params: InvoiceListParams): Promise<InvoiceListResponse> {
-    return {
-      items: [],
-      pagination: emptyPagination(params.page, params.pageSize),
+    try {
+      const { data } = await apiClient.get<InvoiceListResponse>(endpoints.billing.invoices, {
+        params: {
+          search: params.search || undefined,
+          status: params.status !== 'ALL' ? params.status : undefined,
+          page: params.page,
+          pageSize: params.pageSize,
+        },
+      })
+      return data
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to load invoices.'))
     }
   },
 
-  async getInvoice(_id: string): Promise<InvoiceDetails | null> {
-    return null
+  async getInvoice(id: string): Promise<InvoiceDetails | null> {
+    try {
+      const { data } = await apiClient.get<{ success: boolean; data: any }>(
+        endpoints.billing.invoice(id),
+      )
+      return data.data ? normalizeInvoiceDetails(data.data) : null
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to load invoice.'))
+    }
   },
 
-  async createInvoice(_payload: InvoicePayload): Promise<InvoiceDetails | null> {
-    return null
+  async createInvoice(payload: InvoicePayload): Promise<InvoiceDetails | null> {
+    try {
+      const { data } = await apiClient.post<{ success: boolean; data: any }>(
+        endpoints.billing.invoices,
+        toApiInvoiceBody(payload),
+      )
+      return data.data ? normalizeInvoiceDetails(data.data) : null
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to create invoice.'))
+    }
   },
 
-  async updateInvoice(
-    _id: string,
-    _payload: Partial<InvoicePayload>,
-  ): Promise<InvoiceDetails | null> {
-    return null
+  async updateInvoice(id: string, payload: Partial<InvoicePayload>): Promise<InvoiceDetails | null> {
+    try {
+      const body = toApiInvoiceBody(payload as InvoicePayload)
+      // Keep existing invoice number on update — omit generated number.
+      const { number: _number, ...updateBody } = body
+      const { data } = await apiClient.patch<{ success: boolean; data: any }>(
+        endpoints.billing.invoice(id),
+        updateBody,
+      )
+      return data.data ? normalizeInvoiceDetails(data.data) : null
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to update invoice.'))
+    }
   },
 
-  async deleteInvoice(_id: string): Promise<void> {
-    return Promise.resolve()
+  async deleteInvoice(id: string): Promise<void> {
+    try {
+      await apiClient.delete(endpoints.billing.invoice(id))
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to delete invoice.'))
+    }
   },
 
   async duplicateInvoice(_id: string): Promise<InvoiceDetails | null> {
+    // TODO: Backend duplicate endpoint not implemented
     return null
   },
 
-  async voidInvoice(_id: string): Promise<InvoiceDetails | null> {
-    return null
+  async voidInvoice(id: string): Promise<InvoiceDetails | null> {
+    try {
+      const { data } = await apiClient.post<{ success: boolean; data: InvoiceDetails }>(
+        endpoints.billing.invoiceVoid(id),
+      )
+      return data.data ?? null
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to void invoice.'))
+    }
   },
 
-  async markInvoicePaid(_id: string): Promise<InvoiceDetails | null> {
-    return null
+  async markInvoicePaid(id: string): Promise<InvoiceDetails | null> {
+    try {
+      const { data } = await apiClient.post<{ success: boolean; data: InvoiceDetails }>(
+        endpoints.billing.invoiceMarkPaid(id),
+      )
+      return data.data ?? null
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to mark invoice as paid.'))
+    }
   },
 
-  async sendInvoice(
-    _id: string,
-    _payload: SendInvoicePayload,
-  ): Promise<void> {
-    return Promise.resolve()
+  async sendInvoice(id: string, _payload: SendInvoicePayload): Promise<void> {
+    try {
+      await apiClient.post(endpoints.billing.invoiceSend(id))
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to send invoice.'))
+    }
   },
 
   async downloadInvoicePdf(_id: string): Promise<Blob | null> {
+    // TODO: PDF generation not implemented
     return null
   },
 
-  async recordPayment(_payload: PaymentPayload): Promise<Payment | null> {
-    return null
+  async recordPayment(payload: PaymentPayload): Promise<Payment | null> {
+    try {
+      const { data } = await apiClient.post<{ success: boolean; data: Payment }>(
+        endpoints.billing.payments,
+        payload,
+      )
+      return data.data ?? null
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to record payment.'))
+    }
   },
 
   async getPayments(params: PaymentListParams): Promise<PaymentListResponse> {
-    return {
-      items: [],
-      pagination: emptyPagination(params.page, params.pageSize),
+    try {
+      const { data } = await apiClient.get<PaymentListResponse>(endpoints.billing.payments, {
+        params: { page: params.page, pageSize: params.pageSize },
+      })
+      return data
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Unable to load payments.'))
     }
   },
 
@@ -108,45 +327,136 @@ export const billingService = {
   },
 
   async refundPayment(_id: string): Promise<Payment | null> {
+    // TODO: Refund not implemented
     return null
   },
 
   async getRevenueSummary(): Promise<BillingSummary | null> {
-    return null
+    try {
+      const { data } = await apiClient.get<{ success: boolean; data: any }>(
+        endpoints.billing.summary,
+      )
+      const raw = data.data
+      if (!raw) return null
+
+      const byStatus: Array<{ status: string; count: number; total: number }> =
+        raw.invoicesByStatus ?? []
+      const countFor = (status: string) =>
+        byStatus.find((row) => row.status === status)?.count ?? 0
+
+      const paidInvoiceCount = Number(raw.paidInvoiceCount ?? countFor('PAID'))
+      const overdueInvoiceCount = Number(
+        raw.overdueInvoiceCount ?? countFor('OVERDUE'),
+      )
+      const issuedCount = byStatus.reduce((sum, row) => sum + row.count, 0)
+      const paidProgress = Number(
+        raw.paidProgress ??
+          (issuedCount === 0 ? 0 : (paidInvoiceCount / issuedCount) * 100),
+      )
+
+      return {
+        totalRevenue: Number(raw.totalRevenue ?? 0),
+        outstandingBalance: Number(
+          raw.outstandingBalance ?? raw.outstanding ?? 0,
+        ),
+        paidInvoiceCount,
+        overdueInvoiceCount,
+        paymentsThisMonth: Number(raw.paymentsThisMonth ?? 0),
+        currency: raw.currency ?? 'USD',
+        urgentOutstandingCount: Number(
+          raw.urgentOutstandingCount ?? overdueInvoiceCount,
+        ),
+        paidProgress,
+      }
+    } catch {
+      return null
+    }
   },
 
-  async getRevenueProjection(
-    _months = 6,
-  ): Promise<RevenueProjectionPoint[]> {
+  async getRevenueProjection(_months = 6): Promise<RevenueProjectionPoint[]> {
+    // TODO: Revenue projection endpoint not implemented
     return []
   },
 
   async getRevenueInsights(): Promise<RevenueInsights | null> {
+    // TODO: Insights endpoint not implemented
     return null
   },
 
   async getActionRequired(): Promise<BillingActionRequired[]> {
+    // TODO: Actions endpoint not implemented
     return []
   },
 
-  async getOutstandingInvoices(
-    _search?: string,
-  ): Promise<InvoiceListItem[]> {
-    return []
+  async getOutstandingInvoices(search?: string): Promise<InvoiceListItem[]> {
+    try {
+      const { data } = await apiClient.get<{ items: InvoiceListItem[] }>(
+        endpoints.billing.invoices,
+        { params: { status: 'OVERDUE', search: search || undefined, pageSize: 20 } },
+      )
+      return data.items ?? []
+    } catch {
+      return []
+    }
   },
 
-  async searchClients(_search?: string): Promise<BillingPersonRef[]> {
-    return []
+  async searchClients(search?: string): Promise<BillingPersonRef[]> {
+    try {
+      const { data } = await apiClient.get<{ items: any[] }>(endpoints.clients.root, {
+        params: { search: search || undefined, pageSize: 20 },
+      })
+      return (data.items ?? [])
+        .map((c: any) => ({
+          id: c.id,
+          fullName: c.fullName ?? c.name ?? c.companyName ?? 'Unnamed client',
+          email: c.email ?? null,
+          subtitle: c.companyName ?? c.email ?? null,
+          avatarUrl: c.avatarUrl ?? null,
+        }))
+        .filter((c) => Boolean(c.id))
+    } catch {
+      return []
+    }
   },
 
-  async searchCases(
-    _search?: string,
-    _clientId?: string,
-  ): Promise<BillingCaseRef[]> {
-    return []
+  async searchCases(search?: string, clientId?: string): Promise<BillingCaseRef[]> {
+    try {
+      const { data } = await apiClient.get<{ items: any[] }>(endpoints.cases.root, {
+        params: {
+          search: search || undefined,
+          clientId: clientId || undefined,
+          pageSize: 20,
+        },
+      })
+      return (data.items ?? [])
+        .map((c: any) => ({
+          id: c.id,
+          caseNumber: c.caseNumber ?? c.id?.slice?.(0, 8)?.toUpperCase?.() ?? 'CASE',
+          title: c.title ?? 'Untitled case',
+          clientId: c.client?.id ?? null,
+        }))
+        .filter((c) => Boolean(c.id))
+    } catch {
+      return []
+    }
   },
 
-  async searchLawyers(_search?: string): Promise<BillingPersonRef[]> {
-    return []
+  async searchLawyers(search?: string): Promise<BillingPersonRef[]> {
+    try {
+      const { data } = await apiClient.get<{ items: any[] }>(endpoints.users.root, {
+        params: { search: search || undefined, pageSize: 50 },
+      })
+      return (data.items ?? [])
+        .map((m: any) => ({
+          id: m.userId ?? m.user?.id ?? m.id,
+          fullName: m.user?.fullName ?? m.fullName ?? 'Team member',
+          email: m.user?.email ?? m.email ?? null,
+          subtitle: m.role ?? m.jobTitle ?? null,
+          avatarUrl: m.user?.avatarUrl ?? m.avatarUrl ?? null,
+        }))
+        .filter((m) => Boolean(m.id))
+    } catch {
+      return []
+    }
   },
 }

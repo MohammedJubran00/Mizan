@@ -229,9 +229,9 @@ function InvoiceFormEditor({
             <Card className="flex gap-2 border-dashed p-4 text-xs text-text-secondary">
               <Info className="mt-0.5 size-4 shrink-0 text-blue" />
               <p>
-                Invoices stay in draft until you create or send them. Client,
-                case, and lawyer pickers are backend-ready and currently return
-                empty results.
+                Invoices stay in draft until you create or send them. Use the
+                client, case, and lawyer pickers to link this invoice to your
+                workspace records.
               </p>
             </Card>
           </div>

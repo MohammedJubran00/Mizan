@@ -36,9 +36,11 @@ interface CaseFormProps {
 }
 
 async function searchClients(search: string): Promise<CasePersonRef[]> {
-  const clients = await clientService.getClients({ search: search || undefined })
+  const { items } = await clientService.getClients({
+    search: search || undefined,
+  })
 
-  return clients.map((client) => ({
+  return items.map((client) => ({
     id: client.id,
     fullName: client.fullName,
     subtitle: client.companyName ?? null,

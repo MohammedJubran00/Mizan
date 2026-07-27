@@ -15,6 +15,18 @@ export class BillingRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   // ─── Invoices ───────────────────────────────────────────────────────────
+  async findCaseClientId(
+    workspaceId: string,
+    caseId: string,
+  ): Promise<string | null> {
+    const row = await this.prisma.case.findFirst({
+      where: { id: caseId, workspaceId },
+      select: { clientId: true },
+    })
+
+    return row?.clientId ?? null
+  }
+
   async findManyInvoices(workspaceId: string, query: ListInvoicesQuery): Promise<{ rows: InvoiceRow[]; total: number }> {
     const where: Prisma.InvoiceWhereInput = { workspaceId };
     if (query.clientId) where.clientId = query.clientId;

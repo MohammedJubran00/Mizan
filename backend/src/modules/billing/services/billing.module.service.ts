@@ -82,6 +82,15 @@ export class BillingModuleService {
     }, 0);
     const amount = items.length > 0 ? lineItemsTotal : rest.amount;
 
+    // If a case is selected, the invoice should be billed to the case's client.
+    // UI sends both `clientId` and `caseId`, but to keep data consistent we
+    // derive `clientId` from the case when possible.
+    let effectiveClientId: string | null = rest.clientId ?? null;
+    if (rest.caseId) {
+      const derived = await this.repository.findCaseClientId(auth.workspaceId, rest.caseId);
+      if (derived) effectiveClientId = derived;
+    }
+
     const row = await this.repository.createInvoice({
       workspace: { connect: { id: auth.workspaceId } },
       number: rest.number,
@@ -93,7 +102,7 @@ export class BillingModuleService {
       terms: rest.terms ?? 'DUE_ON_RECEIPT',
       paymentInstructions: rest.paymentInstructions,
       caseSummary: rest.caseSummary,
-      client: rest.clientId ? { connect: { id: rest.clientId } } : undefined,
+      client: effectiveClientId ? { connect: { id: effectiveClientId } } : undefined,
       case: rest.caseId ? { connect: { id: rest.caseId } } : undefined,
       billingLawyer: rest.billingLawyerUserId ? { connect: { id: rest.billingLawyerUserId } } : undefined,
       items: items.length > 0 ? {
@@ -125,8 +134,25 @@ export class BillingModuleService {
 
     const { items, clientId, caseId, billingLawyerUserId, ...rest } = input;
     const updateData: any = { ...rest };
-    if (clientId !== undefined) updateData.client = clientId ? { connect: { id: clientId } } : { disconnect: true };
-    if (caseId !== undefined) updateData.case = caseId ? { connect: { id: caseId } } : { disconnect: true };
+
+    // If case is being linked/changed, derive the invoice client from the
+    // case's client whenever possible.
+    let derivedClientId: string | null = null;
+    const shouldDeriveFromCase = caseId !== undefined && caseId !== null;
+    if (shouldDeriveFromCase && caseId) {
+      derivedClientId = await this.repository.findCaseClientId(auth.workspaceId, caseId);
+    }
+
+    if (clientId !== undefined) {
+      updateData.client = clientId ? { connect: { id: clientId } } : { disconnect: true };
+    }
+    if (caseId !== undefined) {
+      updateData.case = caseId ? { connect: { id: caseId } } : { disconnect: true };
+    }
+    if (derivedClientId) {
+      updateData.client = { connect: { id: derivedClientId } };
+    }
+
     if (billingLawyerUserId !== undefined) updateData.billingLawyer = billingLawyerUserId ? { connect: { id: billingLawyerUserId } } : { disconnect: true };
 
     if (items !== undefined && items.length > 0) {

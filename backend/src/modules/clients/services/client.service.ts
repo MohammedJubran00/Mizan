@@ -15,10 +15,14 @@ export class ClientService {
 
   async list(auth: AuthContext, query: ListClientsQuery) {
     const { rows, total } = await this.repository.findMany(auth.workspaceId, query);
+    const paymentSummaries = await this.repository.getPaymentSummariesForClients(
+      auth.workspaceId,
+      rows.map((row) => row.id),
+    );
     const totalPages = total === 0 ? 0 : Math.ceil(total / query.pageSize);
     return {
       success: true,
-      items: rows.map(mapClient),
+      items: rows.map((row) => mapClient(row, paymentSummaries.get(row.id))),
       pagination: { page: query.page, pageSize: query.pageSize, total, totalPages, hasMore: query.page < totalPages },
     };
   }
@@ -26,7 +30,8 @@ export class ClientService {
   async getById(auth: AuthContext, id: string) {
     const row = await this.repository.findById(auth.workspaceId, id);
     if (!row) throw new AppError(404, 'Client not found.');
-    return mapClient(row);
+    const paymentSummaries = await this.repository.getPaymentSummariesForClients(auth.workspaceId, [id]);
+    return mapClient(row, paymentSummaries.get(id));
   }
 
   async create(auth: AuthContext, input: CreateClientInput) {

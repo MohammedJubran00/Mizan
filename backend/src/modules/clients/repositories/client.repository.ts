@@ -94,4 +94,49 @@ export class ClientRepository {
   async countByWorkspace(workspaceId: string): Promise<number> {
     return this.prisma.client.count({ where: { workspaceId } });
   }
+
+  async getPaymentSummariesForClients(
+    workspaceId: string,
+    clientIds: string[],
+  ): Promise<Map<string, { totalPaid: number; outstanding: number; currency: string }>> {
+    const summaries = new Map<string, { totalPaid: number; outstanding: number; currency: string }>();
+    for (const id of clientIds) {
+      summaries.set(id, { totalPaid: 0, outstanding: 0, currency: 'USD' });
+    }
+    if (clientIds.length === 0) return summaries;
+
+    const [groups, latestCurrencies] = await Promise.all([
+      this.prisma.invoice.groupBy({
+        by: ['clientId', 'status'],
+        where: { workspaceId, clientId: { in: clientIds } },
+        _sum: { amount: true },
+      }),
+      this.prisma.invoice.findMany({
+        where: { workspaceId, clientId: { in: clientIds } },
+        select: { clientId: true, currency: true },
+        orderBy: { issuedAt: 'desc' },
+        distinct: ['clientId'],
+      }),
+    ]);
+
+    for (const row of latestCurrencies) {
+      if (!row.clientId) continue;
+      const entry = summaries.get(row.clientId);
+      if (entry) entry.currency = row.currency;
+    }
+
+    for (const row of groups) {
+      if (!row.clientId) continue;
+      const entry = summaries.get(row.clientId);
+      if (!entry) continue;
+      const amount = Number(row._sum.amount ?? 0);
+      if (row.status === 'PAID') {
+        entry.totalPaid += amount;
+      } else if (row.status === 'SENT' || row.status === 'OVERDUE') {
+        entry.outstanding += amount;
+      }
+    }
+
+    return summaries;
+  }
 }

@@ -1,6 +1,8 @@
+import type { ClientPaymentSummary } from './client-payments';
+import { computeClientPayments } from './client-payments';
 import type { ClientRow } from '../repositories/client.repository';
 
-export function mapClient(row: ClientRow) {
+export function mapClient(row: ClientRow, payments?: ClientPaymentSummary) {
   const activeCases = row.cases.filter((c) => !['CLOSED', 'WON', 'LOST', 'DISMISSED', 'ARCHIVED'].includes(c.status));
   const closedCases = row.cases.filter((c) => ['CLOSED', 'WON', 'LOST', 'DISMISSED', 'ARCHIVED'].includes(c.status));
 
@@ -31,10 +33,7 @@ export function mapClient(row: ClientRow) {
       activeCases: activeCases.length,
       closedCases: closedCases.length,
     },
-    payments: {
-      totalPaid: 0,
-      outstandingBalance: 0,
-    },
+    payments: payments ?? computeClientPayments(row.invoices),
     clientSince: row.createdAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),

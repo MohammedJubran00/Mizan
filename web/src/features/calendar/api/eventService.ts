@@ -42,10 +42,9 @@ function emptyPagination(page: number, pageSize: number): EventPagination {
 }
 
 /**
- * Placeholder data access for the calendar module.
- *
- * `/api/events` does not exist yet, so every method resolves with an empty
- * result. The signatures below are the contract the UI is written against.
+ * TODO: No CalendarEvent model in Prisma — generic event CRUD is unimplemented.
+ * Hearing-backed calendar data lives in `hearingService.getCalendarEvents`.
+ * This service returns empty results so the Calendar UI shows an empty state.
  */
 export const eventService = {
   async getEvents(params: EventListParams): Promise<EventListResponse> {

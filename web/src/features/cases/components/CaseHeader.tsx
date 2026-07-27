@@ -68,7 +68,10 @@ export function CaseHeader({
       ? { icon: UserRound, label: `Lead counsel: ${caseDetails.leadLawyer.fullName}` }
       : null,
     caseDetails.court ? { icon: Gavel, label: caseDetails.court } : null,
-    { icon: Scale, label: practiceAreaLabels[caseDetails.practiceArea] },
+    {
+      icon: Scale,
+      label: practiceAreaLabels[caseDetails.practiceArea] ?? caseDetails.practiceArea,
+    },
   ].filter((entry): entry is { icon: typeof UserRound; label: string } =>
     Boolean(entry),
   )

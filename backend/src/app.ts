@@ -4,9 +4,17 @@ import express from 'express';
 import helmet from 'helmet';
 
 import { env } from './config/env';
+import { prisma } from './config/prisma';
 import { buildAuthModule } from './modules/auth';
 import { buildDashboardModule } from './modules/dashboard';
 import { buildDocumentsModule } from './modules/documents';
+import { buildClientRouter } from './modules/clients/routes/client.routes';
+import { buildCaseRouter } from './modules/cases/routes/case.routes';
+import { buildHearingRouter } from './modules/hearings/routes/hearing.routes';
+import { buildDeadlineRouter } from './modules/deadlines/routes/deadline.routes';
+import { buildBillingRouter } from './modules/billing/routes/billing.routes';
+import { buildUsersRouter } from './modules/users/routes/users.routes';
+import { buildActivitiesRouter } from './modules/activities/routes/activities.routes';
 import { errorHandler } from './shared/errors/errorHandler';
 
 export function createApp() {
@@ -48,6 +56,14 @@ export function createApp() {
     cacheInvalidator,
   });
   app.use('/api/documents', documentRouter);
+
+  app.use('/api/clients', buildClientRouter(prisma, activityEngine, cacheInvalidator));
+  app.use('/api/cases', buildCaseRouter(prisma, activityEngine, cacheInvalidator));
+  app.use('/api/hearings', buildHearingRouter(prisma, activityEngine, cacheInvalidator));
+  app.use('/api/deadlines', buildDeadlineRouter(prisma, activityEngine, cacheInvalidator));
+  app.use('/api/billing', buildBillingRouter(prisma, activityEngine, cacheInvalidator));
+  app.use('/api/users', buildUsersRouter(prisma, activityEngine, cacheInvalidator));
+  app.use('/api/activities', buildActivitiesRouter(prisma));
 
   app.use(errorHandler);
 

@@ -22,7 +22,7 @@ export function useClientList(params: ClientListParams = {}) {
     queryFn: () => clientService.getClients(params),
   })
 
-  const clients = query.data ?? NO_CLIENTS
+  const clients = query.data?.items ?? NO_CLIENTS
 
   const state: ClientResourceState = query.isPending
     ? 'loading'

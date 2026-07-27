@@ -9,9 +9,11 @@ import type { EventCaseRef, EventPersonRef } from '../types'
 export type CaseOption = EventCaseRef & PersonOption
 
 export async function searchClients(search: string): Promise<EventPersonRef[]> {
-  const clients = await clientService.getClients({ search: search || undefined })
+  const { items } = await clientService.getClients({
+    search: search || undefined,
+  })
 
-  return clients.map((client) => ({
+  return items.map((client) => ({
     id: client.id,
     fullName: client.fullName,
     email: client.email,

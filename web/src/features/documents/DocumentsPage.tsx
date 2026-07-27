@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Upload } from 'lucide-react'
+import {
+  FileStack,
+  HardDrive,
+  Link2Off,
+  Upload,
+  CalendarDays,
+} from 'lucide-react'
 
 import { TopBar } from '@/app/layout/TopBar'
 import {
@@ -13,7 +19,7 @@ import {
 import { DocumentDetails } from '@/features/documents/components/DocumentDetails'
 import { DeleteDocumentDialog } from '@/features/documents/components/DeleteDocumentDialog'
 import { DocumentFilters } from '@/features/documents/components/DocumentFilters'
-import { DocumentTable } from '@/features/documents/components/DocumentTable'
+import { DocumentList } from '@/features/documents/components/DocumentList'
 import { PdfViewer } from '@/features/documents/components/PdfViewer'
 import { UploadDialog } from '@/features/documents/components/UploadDialog'
 import type {
@@ -22,11 +28,11 @@ import type {
   DocumentSortField,
   SortDirection,
 } from '@/features/documents/types'
-import { Button } from '@/shared/components/Button'
-import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
-import { formatBytes } from '@/shared/lib/utils'
 import { caseKeys } from '@/features/cases/hooks/useCaseQueries'
 import { clientKeys } from '@/features/clients/hooks/useClientQueries'
+import { Button } from '@/shared/components/Button'
+import { useDebouncedValue } from '@/shared/hooks/useDebouncedValue'
+import { formatBytes, formatCount } from '@/shared/lib/utils'
 
 /** Mirrors the API's MAX_UPLOAD_MB so the dialog can reject oversized files early. */
 const MAX_UPLOAD_MB = Number(import.meta.env.VITE_MAX_UPLOAD_MB ?? 25)
@@ -199,11 +205,7 @@ export function DocumentsPage() {
     <>
       <TopBar
         title="Documents"
-        subtitle={
-          summary
-            ? `${summary.total} document${summary.total === 1 ? '' : 's'} · ${formatBytes(summary.totalSizeBytes)} stored · ${summary.uploadedThisMonth} this month`
-            : 'Filings, contracts, and shared work product'
-        }
+        subtitle="Filings, contracts, and shared work product"
         actions={
           <Button
             size="sm"
@@ -218,9 +220,14 @@ export function DocumentsPage() {
         }
       />
 
-      <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-4 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="relative mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_at_top,_rgba(59,130,246,0.08),_transparent_60%)]"
+        />
+
         {listQuery.isError ? (
-          <div className="rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
+          <div className="relative rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
             {listQuery.error instanceof Error
               ? listQuery.error.message
               : 'Unable to load documents.'}
@@ -228,7 +235,7 @@ export function DocumentsPage() {
         ) : null}
 
         {actionError ? (
-          <div className="flex items-start justify-between gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
+          <div className="relative flex items-start justify-between gap-3 rounded-xl border border-danger/20 bg-danger/5 px-4 py-3 text-sm text-danger">
             <span>{actionError}</span>
             <button
               type="button"
@@ -240,23 +247,50 @@ export function DocumentsPage() {
           </div>
         ) : null}
 
-        <DocumentFilters
-          search={search}
-          onSearchChange={setSearch}
-          category={category}
-          onCategoryChange={setCategory}
-          caseId={caseId}
-          onCaseChange={setCaseId}
-          clientId={clientId}
-          onClientChange={setClientId}
-          facets={listQuery.data?.facets}
-          onReset={resetFilters}
-          hasActiveFilters={hasActiveFilters}
-        />
+        {summary ? (
+          <div className="relative grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <SummaryTile
+              icon={FileStack}
+              label="Documents"
+              value={formatCount(summary.total)}
+            />
+            <SummaryTile
+              icon={HardDrive}
+              label="Storage used"
+              value={formatBytes(summary.totalSizeBytes)}
+            />
+            <SummaryTile
+              icon={CalendarDays}
+              label="Uploaded this month"
+              value={formatCount(summary.uploadedThisMonth)}
+            />
+            <SummaryTile
+              icon={Link2Off}
+              label="Unlinked"
+              value={formatCount(summary.unlinkedCount)}
+            />
+          </div>
+        ) : null}
 
-        <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-          <div className="flex min-w-0 flex-col gap-4">
-            <DocumentTable
+        <div className="relative">
+          <DocumentFilters
+            search={search}
+            onSearchChange={setSearch}
+            category={category}
+            onCategoryChange={setCategory}
+            caseId={caseId}
+            onCaseChange={setCaseId}
+            clientId={clientId}
+            onClientChange={setClientId}
+            facets={listQuery.data?.facets}
+            onReset={resetFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+        </div>
+
+        <div className="relative grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(20rem,24rem)_minmax(0,1fr)]">
+          <div className="flex min-h-[28rem] min-w-0 flex-col gap-3 xl:h-[calc(100vh-14rem)]">
+            <DocumentList
               items={items}
               loading={listQuery.isLoading}
               selectedId={selectedId}
@@ -293,7 +327,9 @@ export function DocumentsPage() {
                 </div>
               </div>
             ) : null}
+          </div>
 
+          <div className="flex min-w-0 flex-col gap-4 xl:h-[calc(100vh-14rem)]">
             {selected ? (
               <DocumentDetails
                 document={selected}
@@ -301,24 +337,25 @@ export function DocumentsPage() {
                 onSave={(payload) =>
                   updateMutation.mutate({ id: selected.id, payload })
                 }
+                onDelete={() => setPendingDelete(selected)}
               />
             ) : null}
-          </div>
 
-          <div className="min-h-[32rem] xl:sticky xl:top-20 xl:h-[calc(100vh-7rem)]">
-            <PdfViewer
-              blob={previewQuery.data ?? null}
-              loading={previewQuery.isLoading}
-              error={
-                previewQuery.isError
-                  ? previewQuery.error instanceof Error
-                    ? previewQuery.error.message
-                    : 'Unable to preview this document.'
-                  : null
-              }
-              onDownload={() => void handleDownload()}
-              downloading={downloading}
-            />
+            <div className="min-h-[24rem] flex-1">
+              <PdfViewer
+                blob={previewQuery.data ?? null}
+                loading={previewQuery.isLoading}
+                error={
+                  previewQuery.isError
+                    ? previewQuery.error instanceof Error
+                      ? previewQuery.error.message
+                      : 'Unable to preview this document.'
+                    : null
+                }
+                onDownload={() => void handleDownload()}
+                downloading={downloading}
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -347,5 +384,29 @@ export function DocumentsPage() {
         onCancel={() => setPendingDelete(null)}
       />
     </>
+  )
+}
+
+function SummaryTile({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof FileStack
+  label: string
+  value: string
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-white/90 px-4 py-3 shadow-[0_1px_2px_rgba(26,46,90,0.04)] backdrop-blur-sm">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-blue-soft text-blue">
+        <Icon className="size-4" />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
+          {label}
+        </p>
+        <p className="truncate font-display text-xl text-navy">{value}</p>
+      </div>
+    </div>
   )
 }

@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Check, Pencil, X } from 'lucide-react'
+import {
+  Briefcase,
+  Check,
+  Pencil,
+  Trash2,
+  UserRound,
+  X,
+} from 'lucide-react'
 
 import {
   DOCUMENT_CATEGORIES,
@@ -18,12 +25,14 @@ interface DocumentDetailsProps {
     description: string | null
     category: DocumentCategory
   }) => void
+  onDelete: () => void
 }
 
 export function DocumentDetails({
   document,
   saving,
   onSave,
+  onDelete,
 }: DocumentDetailsProps) {
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(document.title)
@@ -37,10 +46,16 @@ export function DocumentDetails({
     setCategory(document.category)
   }, [document])
 
+  const caseLabel = document.caseTitle
+    ? document.caseNumber
+      ? `${document.caseNumber} — ${document.caseTitle}`
+      : document.caseTitle
+    : 'Unlinked'
+
   return (
-    <section className="rounded-2xl border border-border-subtle bg-white p-4">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <section className="rounded-2xl border border-border-subtle bg-white p-4 shadow-[0_1px_2px_rgba(26,46,90,0.04)]">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           {editing ? (
             <input
               value={title}
@@ -49,7 +64,7 @@ export function DocumentDetails({
               className="w-full rounded-lg border border-border bg-white px-2.5 py-1.5 text-sm font-semibold text-text outline-none focus:border-blue focus:ring-4 focus:ring-blue/15"
             />
           ) : (
-            <h3 className="truncate font-display text-lg text-navy">
+            <h3 className="truncate font-display text-xl text-navy">
               {document.title}
             </h3>
           )}
@@ -84,14 +99,20 @@ export function DocumentDetails({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="shrink-0 rounded-lg p-2 text-text-muted transition hover:bg-surface-muted hover:text-navy"
-            aria-label="Edit document details"
-          >
-            <Pencil className="size-4" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setEditing(true)}
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </Button>
+            <Button size="sm" variant="danger" onClick={onDelete}>
+              <Trash2 className="size-3.5" />
+              Delete
+            </Button>
+          </div>
         )}
       </div>
 
@@ -128,44 +149,64 @@ export function DocumentDetails({
           </label>
         </div>
       ) : (
-        <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-          <Detail label="Category" value={DOCUMENT_CATEGORY_LABELS[document.category]} />
-          <Detail label="Uploaded" value={formatShortDate(document.createdAt)} />
-          <Detail
-            label="Case"
-            value={
-              document.caseTitle
-                ? document.caseNumber
-                  ? `${document.caseNumber} — ${document.caseTitle}`
-                  : document.caseTitle
-                : 'Unlinked'
-            }
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MetaChip
+            label="Category"
+            value={DOCUMENT_CATEGORY_LABELS[document.category]}
           />
-          <Detail label="Client" value={document.clientName ?? 'Unlinked'} />
-          <Detail
+          <MetaChip
+            label="Uploaded"
+            value={formatShortDate(document.createdAt)}
+          />
+          <MetaChip
+            label="Case"
+            value={caseLabel}
+            icon={Briefcase}
+          />
+          <MetaChip
+            label="Client"
+            value={document.clientName ?? 'Unlinked'}
+            icon={UserRound}
+          />
+          <MetaChip
             label="Uploaded by"
             value={document.uploadedBy?.fullName ?? 'Unknown'}
           />
-          <Detail label="Size" value={formatBytes(document.sizeBytes)} />
+          <MetaChip label="Size" value={formatBytes(document.sizeBytes)} />
           {document.description ? (
-            <div className="col-span-2">
-              <dt className="text-text-muted">Description</dt>
-              <dd className="mt-0.5 text-text-secondary">
+            <div className="sm:col-span-2 rounded-xl bg-surface-muted/70 px-3 py-2.5">
+              <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
+                Description
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-text-secondary">
                 {document.description}
-              </dd>
+              </p>
             </div>
           ) : null}
-        </dl>
+        </div>
       )}
     </section>
   )
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
+function MetaChip({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string
+  value: string
+  icon?: typeof Briefcase
+}) {
   return (
-    <div className="min-w-0">
-      <dt className="text-text-muted">{label}</dt>
-      <dd className="mt-0.5 truncate font-medium text-text">{value}</dd>
+    <div className="min-w-0 rounded-xl bg-surface-muted/70 px-3 py-2.5">
+      <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-text-muted">
+        {label}
+      </p>
+      <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm font-medium text-navy">
+        {Icon ? <Icon className="size-3.5 shrink-0 text-text-muted" /> : null}
+        <span className="truncate">{value}</span>
+      </p>
     </div>
   )
 }

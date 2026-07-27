@@ -13,6 +13,7 @@ interface InvoiceItemsTableProps {
 }
 
 export function InvoiceItemsTable({ items, currency }: InvoiceItemsTableProps) {
+  const rows = items ?? []
   const columns: DataTableColumn<InvoiceItem>[] = [
     {
       id: 'description',
@@ -67,7 +68,7 @@ export function InvoiceItemsTable({ items, currency }: InvoiceItemsTableProps) {
       <DataTable
         caption="Invoice line items"
         columns={columns}
-        rows={items}
+        rows={rows}
         rowKey={(row) => row.id}
         empty={
           <EmptyState

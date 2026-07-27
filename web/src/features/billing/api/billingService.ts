@@ -37,6 +37,129 @@ function emptyPagination(page: number, pageSize: number): BillingPagination {
   return { page, pageSize, total: 0, totalPages: 0, hasMore: false }
 }
 
+function mapPerson(raw: any): BillingPersonRef | null {
+  if (!raw) return null
+  return {
+    id: raw.id,
+    fullName: raw.fullName ?? raw.name ?? 'Unknown',
+    email: raw.email ?? null,
+    subtitle: raw.subtitle ?? null,
+  }
+}
+
+/** Normalize backend invoice payload into the UI InvoiceDetails shape. */
+function normalizeInvoiceDetails(raw: any): InvoiceDetails {
+  const items = (raw.items ?? []).map((item: any, index: number) => {
+    const quantity = Number(item.quantity ?? 0)
+    const rate = Number(item.rate ?? 0)
+    const taxRate = Number(item.taxRate ?? 0)
+    const discountRate = Number(item.discountRate ?? 0)
+    const gross = quantity * rate
+    const afterDiscount = gross * (1 - discountRate / 100)
+    const amount = Number(item.amount ?? afterDiscount * (1 + taxRate / 100))
+
+    return {
+      id: item.id ?? `item-${index}`,
+      description: item.description ?? '',
+      quantity,
+      rate,
+      taxRate,
+      discountRate,
+      amount,
+    }
+  })
+
+  const subtotal = items.reduce(
+    (sum: number, item: { quantity: number; rate: number }) =>
+      sum + item.quantity * item.rate,
+    0,
+  )
+  const discountAmount = items.reduce(
+    (sum: number, item: { quantity: number; rate: number; discountRate: number }) =>
+      sum + item.quantity * item.rate * (item.discountRate / 100),
+    0,
+  )
+  const taxAmount = items.reduce(
+    (
+      sum: number,
+      item: { quantity: number; rate: number; discountRate: number; taxRate: number },
+    ) => {
+      const afterDiscount =
+        item.quantity * item.rate * (1 - item.discountRate / 100)
+      return sum + afterDiscount * (item.taxRate / 100)
+    },
+    0,
+  )
+  const total = Number(raw.amount ?? subtotal - discountAmount + taxAmount)
+  const amountPaid =
+    raw.status === 'PAID' || raw.paidAt ? total : Number(raw.amountPaid ?? 0)
+
+  const payments = Array.isArray(raw.payments)
+    ? raw.payments
+    : raw.payment
+      ? [
+          {
+            id: raw.payment.id,
+            invoiceId: raw.id,
+            invoiceNumber: raw.number,
+            client: mapPerson(raw.client),
+            amount: total,
+            currency: raw.currency ?? 'USD',
+            method: raw.payment.paymentMethod ?? 'OTHER',
+            status:
+              raw.payment.status === 'POSTED' ? 'COMPLETED' : raw.payment.status,
+            paymentDate: raw.payment.occurredAt ?? raw.paidAt ?? raw.updatedAt,
+            referenceNumber: null,
+            notes: null,
+            recordedAt: raw.payment.occurredAt ?? raw.updatedAt,
+          },
+        ]
+      : []
+
+  const status =
+    raw.status === 'CANCELLED' || raw.status === 'REFUNDED' ? 'VOID' : raw.status
+
+  return {
+    id: raw.id,
+    number: raw.number ?? raw.id?.slice?.(0, 8)?.toUpperCase?.() ?? 'INV',
+    status: status ?? 'DRAFT',
+    currency: raw.currency ?? 'USD',
+    terms: raw.terms ?? 'NET_30',
+    issueDate: raw.issueDate ?? raw.issuedAt ?? new Date().toISOString(),
+    dueDate: raw.dueDate ?? raw.dueAt ?? null,
+    client: mapPerson(raw.client),
+    relatedCase: raw.relatedCase
+      ? {
+          id: raw.relatedCase.id,
+          caseNumber: raw.relatedCase.caseNumber ?? '',
+          title: raw.relatedCase.title ?? '',
+        }
+      : raw.case
+        ? {
+            id: raw.case.id,
+            caseNumber: raw.case.caseNumber ?? '',
+            title: raw.case.title ?? '',
+          }
+        : null,
+    billingLawyer: mapPerson(raw.billingLawyer),
+    items,
+    subtotal,
+    tax: { rate: 0, amount: taxAmount },
+    discount: { rate: 0, amount: discountAmount },
+    total,
+    amountPaid,
+    balanceDue: Math.max(0, total - amountPaid),
+    paymentInstructions: raw.paymentInstructions ?? null,
+    caseSummary: raw.caseSummary ?? null,
+    timeline: raw.timeline ?? [],
+    payments,
+    activities: raw.activities ?? [],
+    notes: raw.notes ?? [],
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+    updatedAt: raw.updatedAt ?? new Date().toISOString(),
+  }
+}
+
 function toApiInvoiceBody(payload: Partial<InvoicePayload>) {
   const items = (payload.items ?? []).map((item, index) => ({
     description: item.description,
@@ -92,10 +215,10 @@ export const billingService = {
 
   async getInvoice(id: string): Promise<InvoiceDetails | null> {
     try {
-      const { data } = await apiClient.get<{ success: boolean; data: InvoiceDetails }>(
+      const { data } = await apiClient.get<{ success: boolean; data: any }>(
         endpoints.billing.invoice(id),
       )
-      return data.data ?? null
+      return data.data ? normalizeInvoiceDetails(data.data) : null
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Unable to load invoice.'))
     }
@@ -103,11 +226,11 @@ export const billingService = {
 
   async createInvoice(payload: InvoicePayload): Promise<InvoiceDetails | null> {
     try {
-      const { data } = await apiClient.post<{ success: boolean; data: InvoiceDetails }>(
+      const { data } = await apiClient.post<{ success: boolean; data: any }>(
         endpoints.billing.invoices,
         toApiInvoiceBody(payload),
       )
-      return data.data ?? null
+      return data.data ? normalizeInvoiceDetails(data.data) : null
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Unable to create invoice.'))
     }
@@ -118,11 +241,11 @@ export const billingService = {
       const body = toApiInvoiceBody(payload as InvoicePayload)
       // Keep existing invoice number on update — omit generated number.
       const { number: _number, ...updateBody } = body
-      const { data } = await apiClient.patch<{ success: boolean; data: InvoiceDetails }>(
+      const { data } = await apiClient.patch<{ success: boolean; data: any }>(
         endpoints.billing.invoice(id),
         updateBody,
       )
-      return data.data ?? null
+      return data.data ? normalizeInvoiceDetails(data.data) : null
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Unable to update invoice.'))
     }
